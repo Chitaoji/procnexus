@@ -34,13 +34,6 @@ def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
     ProcNexus[P]
         A scheduler bound to ``func``.
 
-    Raises
-    ------
-    TypeError
-        If ``processes`` is not an integer.
-    TypeError
-        If ``func`` is not callable.
-
     """
     if not isinstance(processes, int):
         raise TypeError(
@@ -79,6 +72,7 @@ class ProcNexus[T, **P]:
             Positional arguments passed to the bound callable.
         **kwargs : P.kwargs
             Keyword arguments passed to the bound callable.
+
         """
         self.params.append((args, kwargs))
 
@@ -93,15 +87,13 @@ class ProcNexus[T, **P]:
 
         """
         if self.processes == 0:
-            return [
-                _invoke_func(self.func, args, kwargs) for args, kwargs in self.params
-            ]
+            return [self.func(*args, **kwargs) for args, kwargs in self.params]
 
-        pool_processes = self.processes
-        if pool_processes < 0:
-            pool_processes = cpu_count() or 1
+        processes = self.processes
+        if processes < 0:
+            processes = cpu_count() or 1
 
-        with Pool(processes=pool_processes) as pool:
+        with Pool(processes=processes) as pool:
             res = pool.starmap(
                 _invoke_func,
                 ((self.func, args, kwargs) for args, kwargs in self.params),
