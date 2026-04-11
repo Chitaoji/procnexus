@@ -12,6 +12,10 @@ from multiprocessing import Pool
 from typing import Callable
 
 
+def _invoke[T, **P](func: Callable[P, T], args: tuple[object, ...], kwargs: dict[str, object]) -> T:
+    return func(*args, **kwargs)
+
+
 def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
     if not isinstance(processes, int):
         raise TypeError(
@@ -26,12 +30,15 @@ class ProcNexus[T, **P]:
     def __init__(self, func: Callable[P, T], processes: int) -> None:
         self.func = func
         self.processes = processes
-        self.params: list[P] = []
+        self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
     def submit(self, *args: P.args, **kwargs: P.kwargs) -> None:
-        pass
+        self.params.append((args, kwargs))
 
     def run(self) -> list[T]:
         with Pool(processes=self.processes) as pool:
-            res = pool.starmap(self.func, self.params)
+            res = pool.starmap(
+                _invoke,
+                ((self.func, args, kwargs) for args, kwargs in self.params),
+            )
         return res
