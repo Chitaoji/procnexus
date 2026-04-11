@@ -9,6 +9,7 @@ NOTE: this module is private. All functions and objects are available in the mai
 __all__ = ["nexus"]
 
 from multiprocessing import Pool
+from os import cpu_count
 from typing import Callable
 
 
@@ -91,7 +92,16 @@ class ProcNexus[T, **P]:
             Results returned by each submitted invocation, in submission order.
 
         """
-        with Pool(processes=self.processes) as pool:
+        if self.processes == 0:
+            return [
+                _invoke_func(self.func, args, kwargs) for args, kwargs in self.params
+            ]
+
+        pool_processes = self.processes
+        if pool_processes < 0:
+            pool_processes = cpu_count() or 1
+
+        with Pool(processes=pool_processes) as pool:
             res = pool.starmap(
                 _invoke_func,
                 ((self.func, args, kwargs) for args, kwargs in self.params),
