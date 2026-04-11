@@ -39,7 +39,10 @@ print(results)  # [3, 15, 7]
 ### `nexus(func, processes=-1) -> ProcNexus`
 Create a `ProcNexus` runner from a callable.  
 * `func`: target function for each task.
-* `processes`: number of worker processes passed to `multiprocessing.Pool`.
+* `processes`: worker-process setting.
+  * `< 0`: use `os.cpu_count()`.
+  * `= 0`: do not create a process pool; run with normal in-process mapping.
+  * `> 0`: pass directly to `multiprocessing.Pool`.
 
 ### `ProcNexus.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`.
