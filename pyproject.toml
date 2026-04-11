@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "procnexus"
 version = "0.0.0"
 dependencies = []
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 authors = [
   {name = "Chitaoji", email = "2360742040@qq.com"},
 ]

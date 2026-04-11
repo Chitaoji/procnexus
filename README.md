@@ -1,8 +1,7 @@
 # procnexus
 Provides tools for multiprocessing.
 
-`procnexus` offers a tiny, explicit interface for collecting function calls and
-executing them concurrently with Python's `multiprocessing.Pool`.
+`procnexus` offers a tiny, explicit interface for collecting function calls and executing them concurrently with Python's `multiprocessing.Pool`.
 
 ## Installation
 ```sh
@@ -11,7 +10,7 @@ $ pip install procnexus
 
 ## Requirements
 ```txt
-python>=3.12
+
 ```
 
 ## Features
