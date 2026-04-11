@@ -14,19 +14,31 @@ from typing import Callable
 
 def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
     """
-    _summary_.
+    Create a ``ProcNexus`` scheduler for a callable.
+
+    This validates arguments and returns a scheduler instance that can collect
+    task arguments through :meth:`ProcNexus.submit` and execute them in
+    parallel through :meth:`ProcNexus.run`.
+
+    Parameters
+    ----------
+    func : Callable[P, T]
+        Callable executed for each submitted task.
+    processes : int, default=-1
+        Number of worker processes to use. This value is forwarded to
+        :class:`multiprocessing.Pool`.
 
     Returns
     -------
-    _type_
-        _description_.
+    ProcNexus[P]
+        A scheduler bound to ``func``.
 
     Raises
     ------
     TypeError
-        _description_.
+        If ``processes`` is not an integer.
     TypeError
-        _description_.
+        If ``func`` is not callable.
 
     """
     if not isinstance(processes, int):
@@ -40,14 +52,14 @@ def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
 
 class ProcNexus[T, **P]:
     """
-    _summary_.
+    Queue and execute function calls via process-based parallelism.
 
     Parameters
     ----------
     func : Callable[P, T]
-        _description_.
+        Callable executed for each submitted task.
     processes : int
-        _description_.
+        Number of worker processes used by ``multiprocessing.Pool``.
 
     """
 
@@ -58,19 +70,25 @@ class ProcNexus[T, **P]:
 
     def submit(self, *args: P.args, **kwargs: P.kwargs) -> None:
         """
-        _summary_.
+        Queue one invocation for later execution.
 
+        Parameters
+        ----------
+        *args : P.args
+            Positional arguments passed to the bound callable.
+        **kwargs : P.kwargs
+            Keyword arguments passed to the bound callable.
         """
         self.params.append((args, kwargs))
 
     def run(self) -> list[T]:
         """
-        _summary_.
+        Execute all queued tasks and return their results.
 
         Returns
         -------
         list[T]
-            _description_.
+            Results returned by each submitted invocation, in submission order.
 
         """
         with Pool(processes=self.processes) as pool:
