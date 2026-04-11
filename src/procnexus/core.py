@@ -13,7 +13,7 @@ from os import cpu_count
 from typing import Callable
 
 
-def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
+def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P, T]":
     """
     Create a ``ProcNexus`` scheduler for a callable.
 
@@ -31,7 +31,7 @@ def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
 
     Returns
     -------
-    ProcNexus[P]
+    ProcNexus[P, T]
         A scheduler bound to ``func``.
 
     """
@@ -44,7 +44,7 @@ def nexus[T, **P](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P]":
     return ProcNexus(func, processes)
 
 
-class ProcNexus[T, **P]:
+class ProcNexus[**P, T]:
     """
     Queue and execute function calls via process-based parallelism.
 
