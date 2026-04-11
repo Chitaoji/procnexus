@@ -1,8 +1,8 @@
 """
-Contains the core of template: ... , etc.
+Contains the core of procnexus: ... , etc.
 
 NOTE: this module is private. All functions and objects are available in the main
-`template` namespace - use that instead.
+`procnexus` namespace - use that instead.
 
 """
 

@@ -1,5 +1,5 @@
-# *auto-generated*
-A template repository for building python packages.
+# procnexus
+Provides tools for multiprocessing.
 
 ## Installation
 ```sh
