@@ -3,23 +3,23 @@ Provides tools for multiprocessing.
 
 ## Installation
 ```sh
-*auto-generated*
+$ pip install procnexus
 ```
 
 ## Requirements
 ```txt
-*auto-generated*
+
 ```
 
 ## See Also
 ### Github repository
-* *auto-generated*
+* https://github.com/Chitaoji/procnexus/
 
 ### PyPI project
-* *auto-generated*
+* https://pypi.org/project/procnexus/
 
 ## License
-*auto-generated*
+This project falls under the BSD 3-Clause License.
 
 ## History
 ### v0.0.0

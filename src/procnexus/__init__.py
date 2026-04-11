@@ -1,5 +1,16 @@
 """
 # procnexus
+Provides tools for multiprocessing.
+
+## See Also
+### Github repository
+* https://github.com/Chitaoji/procnexus/
+
+### PyPI project
+* https://pypi.org/project/procnexus/
+
+## License
+This project falls under the BSD 3-Clause License.
 
 """
 
