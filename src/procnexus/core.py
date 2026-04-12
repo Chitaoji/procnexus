@@ -41,7 +41,7 @@ def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P,
         )
     if not callable(func):
         raise TypeError(f"func should be callable, got {func} instead")
-    return ProcNexus(func, processes)
+    return ProcNexus(func, processes=processes)
 
 
 class ProcNexus[**P, T]:
@@ -57,7 +57,7 @@ class ProcNexus[**P, T]:
 
     """
 
-    def __init__(self, func: Callable[P, T], processes: int) -> None:
+    def __init__(self, func: Callable[P, T], *, processes: int) -> None:
         self.func = func
         self.processes = processes
         self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
