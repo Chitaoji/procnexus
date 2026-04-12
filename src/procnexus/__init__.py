@@ -1,17 +1,9 @@
+"""
 # procnexus
 Provides tools for multiprocessing.
 
-`procnexus` offers a tiny, explicit interface for collecting function calls and executing them concurrently with Python's `multiprocessing.Pool`.
-
-## Installation
-```sh
-$ pip install procnexus
-```
-
-## Requirements
-```txt
-
-```
+`procnexus` offers a tiny, explicit interface for collecting function calls and
+executing them concurrently with Python's `multiprocessing.Pool`.
 
 ## Features
 * Simple task submission (`submit`) API.
@@ -37,7 +29,7 @@ print(results)  # [3, 15, 7]
 
 ## API
 ### `nexus(func, processes=-1) -> ProcNexus`
-Create a `ProcNexus` runner from a callable.  
+Create a `ProcNexus` runner from a callable.
 * `func`: target function for each task.
 * `processes`: worker-process setting.
   * `< 0`: use `os.cpu_count()`.
@@ -65,6 +57,10 @@ Execute all queued tasks in parallel and return results in submission order.
 ## License
 This project falls under the BSD 3-Clause License.
 
-## History
-### v0.0.0
-* Initial release.
+"""
+
+from . import core
+from .core import *
+
+__all__: list[str] = []
+__all__.extend(core.__all__)
