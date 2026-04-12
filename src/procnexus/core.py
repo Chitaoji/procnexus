@@ -13,7 +13,7 @@ from os import cpu_count
 from typing import Callable
 
 
-def nexus[**P, T](func: Callable[P, T], processes: int = -1) -> "ProcNexus[P, T]":
+def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P, T]":
     """
     Create a ``ProcNexus`` scheduler for a callable.
 
