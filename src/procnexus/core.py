@@ -70,7 +70,7 @@ class ProcNexus[**P, T]:
         self._state: Literal["pending", "running", "joined"] = "pending"
         self._pool: PoolType | None = None
         self._async_results: list[AsyncResult[T]] = []
-        self._result: list[T] | None = None
+        self._result: list[T] = []
 
     def submit(self, *args: P.args, **kwargs: P.kwargs) -> None:
         """
@@ -95,8 +95,6 @@ class ProcNexus[**P, T]:
             return
 
         if self.processes == 0:
-            if self._result is None:
-                raise RuntimeError("nexus is not running")
             self._result.append(self.func(*args, **kwargs))
             return
 
@@ -120,7 +118,9 @@ class ProcNexus[**P, T]:
 
         self._state = "running"
         if self.processes == 0:
-            self._result = [self.func(*args, **kwargs) for args, kwargs in self.params]
+            self._result.extend([
+                self.func(*args, **kwargs) for args, kwargs in self.params
+            ])
             self.params.clear()
             return self
 
@@ -155,7 +155,7 @@ class ProcNexus[**P, T]:
 
         self._state = "joined"
         if self.processes == 0:
-            return self._result or []
+            return self._result
 
         if self._pool is None:
             raise RuntimeError("nexus is not running")
@@ -167,11 +167,10 @@ class ProcNexus[**P, T]:
             raise
         else:
             self._pool.close()
-            return res
         finally:
             self._pool.join()
             self._pool = None
-            self._async_results = []
+        return res
 
     def _submit_to_pool(
         self, args: tuple[object, ...], kwargs: dict[str, object]
