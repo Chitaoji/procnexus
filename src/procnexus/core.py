@@ -6,15 +6,13 @@ NOTE: this module is private. All functions and objects are available in the mai
 
 """
 
-from __future__ import annotations
-
 __all__ = ["nexus"]
 
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from multiprocessing.pool import Pool as PoolType
 from os import cpu_count
-from typing import Callable, Literal
+from typing import Callable, Literal, Self
 
 
 def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P, T]":
@@ -100,7 +98,7 @@ class ProcNexus[**P, T]:
 
         self._async_results.append(self._submit_to_pool(args, kwargs))
 
-    def start(self) -> "ProcNexus[P, T]":
+    def start(self) -> Self:
         """
         Start executing queued tasks.
 
