@@ -168,7 +168,8 @@ class ProcNexus[**P, T]:
         """
         Return task results in submission order.
 
-        If the nexus is still running, this waits for completion first.
+        If the nexus is still running, this raises instead of implicitly
+        joining; call :meth:`join` before retrieving results.
 
         Returns
         -------
@@ -179,7 +180,7 @@ class ProcNexus[**P, T]:
         if self._state == "pending":
             raise RuntimeError("cannot get results before start() has been called")
         if self._state == "running":
-            self.join()
+            raise RuntimeError("cannot get results before join() has been called")
         return self._result
 
     def _submit_to_pool(

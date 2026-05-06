@@ -63,7 +63,7 @@ Start executing all queued tasks. With `processes=0`, this computes immediately 
 Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly.
 
 ### `ProcNexus.get() -> list`
-Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` waits for it to finish before returning.
+Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
 
 ### `ProcNexus.run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
@@ -71,7 +71,7 @@ Execute all currently queued tasks in parallel and return results in submission 
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
 * Arguments must also be serializable for inter-process communication.
-* Exceptions from worker processes propagate when calling `join()`, `get()`, or `run()`.
+* Exceptions from worker processes propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
