@@ -133,13 +133,21 @@ class ProcNexus[**P, T]:
         self.params.clear()
         return
 
-    def join(self) -> None:
+    def join(self, timeout: float | None = None) -> None:
         """
         Wait for asynchronous execution to finish.
 
         Results include every invocation submitted before this method is called,
         including invocations submitted after :meth:`start`. Use :meth:`get` to
         retrieve them.
+
+        Parameters
+        ----------
+        timeout : float | None, default=None
+            Maximum number of seconds to wait for each process-pool task.
+            ``None`` waits indefinitely. When the timeout expires, unfinished
+            worker processes are terminated and ``multiprocessing.TimeoutError``
+            is raised.
 
         """
         if self._state == "pending":
@@ -156,7 +164,7 @@ class ProcNexus[**P, T]:
 
         try:
             self._result = [
-                async_result.get() for async_result in self._async_results
+                async_result.get(timeout) for async_result in self._async_results
             ]
         except BaseException:
             self._pool.terminate()
