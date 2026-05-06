@@ -69,12 +69,16 @@ class ProcNexus[**P, T]:
         self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
         self._state: Literal["pending", "running", "joined"] = "pending"
         self._pool: PoolType | None = None
-        self._async_result: AsyncResult[list[T]] | None = None
+        self._async_results: list[AsyncResult[T]] = []
         self._result: list[T] | None = None
 
     def submit(self, *args: P.args, **kwargs: P.kwargs) -> None:
         """
-        Queue one invocation for later execution.
+        Queue or schedule one invocation.
+
+        Before :meth:`start`, the invocation is stored for later execution.
+        After :meth:`start` and before :meth:`join`, it is scheduled immediately
+        and included in the eventual ordered result.
 
         Parameters
         ----------
@@ -84,9 +88,19 @@ class ProcNexus[**P, T]:
             Keyword arguments passed to the bound callable.
 
         """
-        if self._state != "pending":
-            raise RuntimeError("cannot submit tasks after the nexus has started")
-        self.params.append((args, kwargs))
+        if self._state == "joined":
+            raise RuntimeError("cannot submit tasks after the nexus has joined")
+        if self._state == "pending":
+            self.params.append((args, kwargs))
+            return
+
+        if self.processes == 0:
+            if self._result is None:
+                raise RuntimeError("nexus is not running")
+            self._result.append(self.func(*args, **kwargs))
+            return
+
+        self._async_results.append(self._submit_to_pool(args, kwargs))
 
     def start(self) -> "ProcNexus[P, T]":
         """
@@ -107,6 +121,7 @@ class ProcNexus[**P, T]:
         self._state = "running"
         if self.processes == 0:
             self._result = [self.func(*args, **kwargs) for args, kwargs in self.params]
+            self.params.clear()
             return self
 
         processes = self.processes
@@ -114,15 +129,18 @@ class ProcNexus[**P, T]:
             processes = cpu_count() or 1
 
         self._pool = Pool(processes=processes)
-        self._async_result = self._pool.starmap_async(
-            _invoke_func,
-            ((self.func, args, kwargs) for args, kwargs in self.params),
-        )
+        self._async_results = [
+            self._submit_to_pool(args, kwargs) for args, kwargs in self.params
+        ]
+        self.params.clear()
         return self
 
     def join(self) -> list[T]:
         """
         Wait for asynchronous execution to finish and return task results.
+
+        Results include every invocation submitted before this method is called,
+        including invocations submitted after :meth:`start`.
 
         Returns
         -------
@@ -139,11 +157,11 @@ class ProcNexus[**P, T]:
         if self.processes == 0:
             return self._result or []
 
-        if self._async_result is None or self._pool is None:
+        if self._pool is None:
             raise RuntimeError("nexus is not running")
 
         try:
-            res = self._async_result.get()
+            res = [async_result.get() for async_result in self._async_results]
         except BaseException:
             self._pool.terminate()
             raise
@@ -153,7 +171,14 @@ class ProcNexus[**P, T]:
         finally:
             self._pool.join()
             self._pool = None
-            self._async_result = None
+            self._async_results = []
+
+    def _submit_to_pool(
+        self, args: tuple[object, ...], kwargs: dict[str, object]
+    ) -> AsyncResult[T]:
+        if self._pool is None:
+            raise RuntimeError("nexus is not running")
+        return self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
 
     def run(self) -> list[T]:
         """
