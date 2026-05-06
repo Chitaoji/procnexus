@@ -96,7 +96,11 @@ class ProcNexus[**P, T]:
             self._result.append(self.func(*args, **kwargs))
             return
 
-        self._async_results.append(self._submit_to_pool(args, kwargs))
+        if self._pool is None:
+            raise RuntimeError("nexus is not running")
+        self._async_results.append(
+            self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
+        )
 
     def start(self) -> None:
         """
@@ -123,7 +127,8 @@ class ProcNexus[**P, T]:
 
         self._pool = Pool(processes=processes)
         self._async_results = [
-            self._submit_to_pool(args, kwargs) for args, kwargs in self.params
+            self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
+            for args, kwargs in self.params
         ]
         self.params.clear()
         return
@@ -182,13 +187,6 @@ class ProcNexus[**P, T]:
         if self._state == "running":
             raise RuntimeError("cannot get results before join() has been called")
         return self._result
-
-    def _submit_to_pool(
-        self, args: tuple[object, ...], kwargs: dict[str, object]
-    ) -> AsyncResult[T]:
-        if self._pool is None:
-            raise RuntimeError("nexus is not running")
-        return self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
 
     def run(self) -> list[T]:
         """
