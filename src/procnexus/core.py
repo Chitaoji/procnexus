@@ -118,9 +118,9 @@ class ProcNexus[**P, T]:
 
         self._state = "running"
         if self.processes == 0:
-            self._result.extend([
+            self._result.extend(
                 self.func(*args, **kwargs) for args, kwargs in self.params
-            ])
+            )
             self.params.clear()
             return self
 
@@ -149,7 +149,7 @@ class ProcNexus[**P, T]:
 
         """
         if self._state == "pending":
-            raise RuntimeError("cannot join before start has been called")
+            raise RuntimeError("cannot join before start() has been called")
         if self._state == "joined":
             raise RuntimeError("cannot join a nexus more than once")
 
