@@ -12,6 +12,7 @@ __all__ = ["nexus"]
 
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
+from multiprocessing.pool import Pool as PoolType
 from os import cpu_count
 from typing import Callable, Literal
 
@@ -67,7 +68,7 @@ class ProcNexus[**P, T]:
         self.processes = processes
         self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
         self._state: Literal["pending", "running", "joined"] = "pending"
-        self._pool: Pool | None = None
+        self._pool: PoolType | None = None
         self._async_result: AsyncResult[list[T]] | None = None
         self._result: list[T] | None = None
 
