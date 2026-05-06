@@ -170,7 +170,7 @@ class ProcNexus[**P, T]:
         finally:
             self._pool.join()
             self._pool = None
-            self._async_results = []
+            self._async_results.clear()
         return res
 
     def _submit_to_pool(
