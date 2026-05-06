@@ -85,6 +85,9 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.2
+* Made `run()` stateless: it now returns results without changing the pending lifecycle state or consuming queued tasks, so it can be called repeatedly before `start()`.
+* Updated process-pool `run()` execution to use `multiprocessing.Pool.starmap`, preserving ordered results and keyword-argument handling while keeping queued tasks available for a later async run.
+* Added unit coverage for repeated `run()` calls, process-pool execution, keyword arguments, and rejecting `run()` after `start()`.
 
 ### v0.0.1
 * Added asynchronous execution with `start()`, `join()`, and `get()`, while keeping `run()` as the one-shot convenience API.
