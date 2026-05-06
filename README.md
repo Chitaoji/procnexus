@@ -66,7 +66,7 @@ Wait for a previously started run to finish. Results are stored on the runner in
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` waits for it to finish before returning.
 
 ### `ProcNexus.run() -> list`
-Execute all queued tasks in parallel and return results in submission order. This is equivalent to calling `start()`, `join()`, and then `get()`.
+Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
@@ -84,6 +84,11 @@ Execute all queued tasks in parallel and return results in submission order. Thi
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.2
+* Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
+* Updated process-pool `run()` execution to use `multiprocessing.Pool.starmap`, preserving ordered results and keyword-argument handling while keeping queued tasks available for a later async run.
+* Added unit coverage for repeated `run()` calls, process-pool execution, keyword arguments, and rejecting `run()` after `start()`.
+
 ### v0.0.1
 * Added asynchronous execution with `start()`, `join()`, and `get()`, while keeping `run()` as the one-shot convenience API.
 * Allowed `submit()` calls after `start()` and before `join()`, preserving submission-order results across queued and late-submitted tasks.
