@@ -1,6 +1,6 @@
 import unittest
 
-from procnexus import nexus
+from src.procnexus import nexus
 
 
 def add(a: int, b: int) -> int:
