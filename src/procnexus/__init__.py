@@ -8,7 +8,7 @@ executing them concurrently with Python's `multiprocessing.Pool`.
 ## Features
 * Simple task submission (`submit`) API.
 * Batch execution with process pools.
-* Asynchronous execution with `start()` and `join()`.
+* Asynchronous execution with `start()` and `join()`; tasks can be submitted after `start()` and before `join()`.
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
 
@@ -32,9 +32,10 @@ job = nexus(add, processes=4)
 job.submit(1, 2)
 job.submit(10, 5)
 job.start()
-# Do other work here...
+# Do other work here, and optionally submit more tasks before joining.
+job.submit(-1, 8)
 results = job.join()
-print(results)  # [3, 15]
+print(results)  # [3, 15, 7]
 ```
 
 ## API
@@ -47,13 +48,13 @@ Create a `ProcNexus` runner from a callable.
   * `> 0`: pass directly to `multiprocessing.Pool`.
 
 ### `ProcNexus.submit(*args, **kwargs) -> None`
-Queue one invocation of `func`.
+Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `join()` result.
 
 ### `ProcNexus.start() -> ProcNexus`
 Start executing all queued tasks and return the current `ProcNexus` instance. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
 
 ### `ProcNexus.join() -> list`
-Wait for a previously started run to finish and return results in submission order.
+Wait for a previously started run to finish and return results in submission order, including tasks submitted after `start()`.
 
 ### `ProcNexus.run() -> list`
 Execute all queued tasks in parallel and return results in submission order. This is equivalent to `start().join()`.
