@@ -11,7 +11,7 @@ $ pip install procnexus
 ## ✨ Features
 * Simple task submission (`submit`) API.
 * Batch execution with process pools.
-* Asynchronous execution with `start()` and `join()`; tasks can be submitted after `start()` and before `join()`.
+* Asynchronous execution with `start()` and `join()`
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
 
