@@ -85,6 +85,11 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.1
+* Added configurable process handling: negative values use `os.cpu_count()`, `0` runs in-process, and positive values configure `multiprocessing.Pool`.
+* Added asynchronous execution with `start()`, `join()`, and `get()`, while keeping `run()` as the one-shot convenience API.
+* Allowed `submit()` calls after `start()` and before `join()`, preserving submission-order results across queued and late-submitted tasks.
+* Changed `start()` and `join()` to manage lifecycle only and return `None`; retrieve results with `get()` or `run()`.
+* Expanded README/API documentation and added unit coverage for async lifecycle, ordered results, and invalid state transitions.
 
 ### v0.0.0
 * Initial release.
