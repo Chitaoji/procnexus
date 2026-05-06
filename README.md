@@ -66,7 +66,7 @@ Wait for a previously started run to finish. Results are stored on the runner in
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` waits for it to finish before returning.
 
 ### `ProcNexus.run() -> list`
-Execute all queued tasks in parallel and return results in submission order. This is equivalent to calling `start()`, `join()`, and then `get()`.
+Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
