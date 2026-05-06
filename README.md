@@ -11,6 +11,7 @@ $ pip install procnexus
 ## ✨ Features
 * Simple task submission (`submit`) API.
 * Batch execution with process pools.
+* Asynchronous execution with `start()` and `join()`.
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
 
@@ -30,6 +31,15 @@ job.submit(-1, 8)
 
 results = job.run()
 print(results)  # [3, 15, 7]
+
+# Or start the work asynchronously and collect it later.
+job = nexus(add, processes=4)
+job.submit(1, 2)
+job.submit(10, 5)
+job.start()
+# Do other work here...
+results = job.join()
+print(results)  # [3, 15]
 ```
 
 ## 🧩 API
@@ -44,13 +54,19 @@ Create a `ProcNexus` runner from a callable.
 ### `ProcNexus.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`.
 
+### `ProcNexus.start() -> ProcNexus`
+Start executing all queued tasks and return the current `ProcNexus` instance. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
+
+### `ProcNexus.join() -> list`
+Wait for a previously started run to finish and return results in submission order.
+
 ### `ProcNexus.run() -> list`
-Execute all queued tasks in parallel and return results in submission order.
+Execute all queued tasks in parallel and return results in submission order. This is equivalent to `start().join()`.
 
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
 * Arguments must also be serializable for inter-process communication.
-* Exceptions from worker processes propagate when calling `run()`.
+* Exceptions from worker processes propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
