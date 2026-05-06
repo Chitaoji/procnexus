@@ -193,15 +193,36 @@ class ProcNexus[**P, T]:
         """
         Execute all queued tasks and return their results.
 
+        This one-shot convenience method does not alter the nexus lifecycle
+        state or consume queued task parameters, so it can be called repeatedly
+        before :meth:`start`.
+
         Returns
         -------
         list[T]
             Results returned by each submitted invocation, in submission order.
 
         """
-        self.start()
-        self.join()
-        return self.get()
+        if self._state != "pending":
+            raise RuntimeError("cannot run a nexus that has already started")
+
+        if self.processes == 0:
+            return [
+                self.func(*args, **kwargs) for args, kwargs in self.params
+            ]
+
+        processes = self.processes
+        if processes < 0:
+            processes = cpu_count() or 1
+
+        with Pool(processes=processes) as pool:
+            return pool.starmap(
+                _invoke_func,
+                (
+                    (self.func, args, kwargs)
+                    for args, kwargs in self.params
+                ),
+            )
 
 
 def _invoke_func[**P, T](
