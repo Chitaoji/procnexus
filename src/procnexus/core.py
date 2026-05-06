@@ -107,7 +107,7 @@ class ProcNexus[**P, T]:
 
         Returns
         -------
-        ProcNexus[P, T]
+        Self
             This scheduler, so callers can chain ``nexus(...).start().join()``.
 
         """
