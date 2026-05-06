@@ -84,5 +84,7 @@ Execute all queued tasks in parallel and return results in submission order. Thi
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.1
+
 ### v0.0.0
 * Initial release.
