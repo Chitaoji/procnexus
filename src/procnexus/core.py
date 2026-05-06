@@ -9,8 +9,10 @@ NOTE: this module is private. All functions and objects are available in the mai
 __all__ = ["nexus"]
 
 from multiprocessing import Pool
+from multiprocessing.pool import AsyncResult
+from multiprocessing.pool import Pool as PoolType
 from os import cpu_count
-from typing import Callable
+from typing import Callable, Literal
 
 
 def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P, T]":
@@ -19,7 +21,8 @@ def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P,
 
     This validates arguments and returns a scheduler instance that can collect
     task arguments through :meth:`ProcNexus.submit` and execute them in
-    parallel through :meth:`ProcNexus.run`.
+    parallel through :meth:`ProcNexus.run`, or asynchronously through
+    :meth:`ProcNexus.start`, :meth:`ProcNexus.join`, and :meth:`ProcNexus.get`.
 
     Parameters
     ----------
@@ -27,7 +30,8 @@ def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P,
         Callable executed for each submitted task.
     processes : int, default=-1
         Number of worker processes to use. This value is forwarded to
-        :class:`multiprocessing.Pool`.
+        :class:`multiprocessing.Pool` when greater than zero. Negative values
+        use ``os.cpu_count()``; zero runs in-process.
 
     Returns
     -------
@@ -61,10 +65,18 @@ class ProcNexus[**P, T]:
         self.func = func
         self.processes = processes
         self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        self._state: Literal["pending", "running", "joined"] = "pending"
+        self._pool: PoolType | None = None
+        self._async_results: list[AsyncResult[T]] = []
+        self._result: list[T] = []
 
     def submit(self, *args: P.args, **kwargs: P.kwargs) -> None:
         """
-        Queue one invocation for later execution.
+        Queue or schedule one invocation.
+
+        Before :meth:`start`, the invocation is stored for later execution.
+        After :meth:`start` and before :meth:`join`, it is scheduled immediately
+        and included in the eventual ordered result.
 
         Parameters
         ----------
@@ -74,7 +86,108 @@ class ProcNexus[**P, T]:
             Keyword arguments passed to the bound callable.
 
         """
-        self.params.append((args, kwargs))
+        if self._state == "joined":
+            raise RuntimeError("cannot submit tasks after the nexus has joined")
+        if self._state == "pending":
+            self.params.append((args, kwargs))
+            return
+
+        if self.processes == 0:
+            self._result.append(self.func(*args, **kwargs))
+            return
+
+        self._async_results.append(self._submit_to_pool(args, kwargs))
+
+    def start(self) -> None:
+        """
+        Start executing queued tasks.
+
+        With ``processes=0``, tasks are computed immediately in the current
+        process. Otherwise, tasks are launched asynchronously in a process pool.
+
+        """
+        if self._state != "pending":
+            raise RuntimeError("cannot start a nexus that has already started")
+
+        self._state = "running"
+        if self.processes == 0:
+            self._result.extend(
+                self.func(*args, **kwargs) for args, kwargs in self.params
+            )
+            self.params.clear()
+            return
+
+        processes = self.processes
+        if processes < 0:
+            processes = cpu_count() or 1
+
+        self._pool = Pool(processes=processes)
+        self._async_results = [
+            self._submit_to_pool(args, kwargs) for args, kwargs in self.params
+        ]
+        self.params.clear()
+        return
+
+    def join(self) -> None:
+        """
+        Wait for asynchronous execution to finish.
+
+        Results include every invocation submitted before this method is called,
+        including invocations submitted after :meth:`start`. Use :meth:`get` to
+        retrieve them.
+
+        """
+        if self._state == "pending":
+            raise RuntimeError("cannot join before start() has been called")
+        if self._state == "joined":
+            raise RuntimeError("cannot join a nexus more than once")
+
+        self._state = "joined"
+        if self.processes == 0:
+            return
+
+        if self._pool is None:
+            raise RuntimeError("nexus is not running")
+
+        try:
+            self._result = [
+                async_result.get() for async_result in self._async_results
+            ]
+        except BaseException:
+            self._pool.terminate()
+            raise
+        else:
+            self._pool.close()
+        finally:
+            self._pool.join()
+            self._pool = None
+            self._async_results.clear()
+        return
+
+    def get(self) -> list[T]:
+        """
+        Return task results in submission order.
+
+        If the nexus is still running, this waits for completion first.
+
+        Returns
+        -------
+        list[T]
+            Results returned by each submitted invocation, in submission order.
+
+        """
+        if self._state == "pending":
+            raise RuntimeError("cannot get results before start() has been called")
+        if self._state == "running":
+            self.join()
+        return self._result
+
+    def _submit_to_pool(
+        self, args: tuple[object, ...], kwargs: dict[str, object]
+    ) -> AsyncResult[T]:
+        if self._pool is None:
+            raise RuntimeError("nexus is not running")
+        return self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
 
     def run(self) -> list[T]:
         """
@@ -86,19 +199,9 @@ class ProcNexus[**P, T]:
             Results returned by each submitted invocation, in submission order.
 
         """
-        if self.processes == 0:
-            return [self.func(*args, **kwargs) for args, kwargs in self.params]
-
-        processes = self.processes
-        if processes < 0:
-            processes = cpu_count() or 1
-
-        with Pool(processes=processes) as pool:
-            res = pool.starmap(
-                _invoke_func,
-                ((self.func, args, kwargs) for args, kwargs in self.params),
-            )
-        return res
+        self.start()
+        self.join()
+        return self.get()
 
 
 def _invoke_func[**P, T](
