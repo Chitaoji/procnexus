@@ -84,6 +84,8 @@ Execute all queued tasks in parallel and return results in submission order. Thi
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.2
+
 ### v0.0.1
 * Added asynchronous execution with `start()`, `join()`, and `get()`, while keeping `run()` as the one-shot convenience API.
 * Allowed `submit()` calls after `start()` and before `join()`, preserving submission-order results across queued and late-submitted tasks.
