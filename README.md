@@ -32,7 +32,7 @@ results = job.run()
 print(results)  # [3, 15, 7]
 ```
 
-## API
+## 🧩 API
 ### `nexus(func, processes=-1) -> ProcNexus`
 Create a `ProcNexus` runner from a callable.  
 * `func`: target function for each task.
@@ -47,7 +47,7 @@ Queue one invocation of `func`.
 ### `ProcNexus.run() -> list`
 Execute all queued tasks in parallel and return results in submission order.
 
-## Notes
+## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
 * Arguments must also be serializable for inter-process communication.
 * Exceptions from worker processes propagate when calling `run()`.
