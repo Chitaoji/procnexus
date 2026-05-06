@@ -12,7 +12,7 @@ from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from multiprocessing.pool import Pool as PoolType
 from os import cpu_count
-from typing import Callable, Literal, Self
+from typing import Callable, Literal
 
 
 def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P, T]":
@@ -22,7 +22,7 @@ def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P,
     This validates arguments and returns a scheduler instance that can collect
     task arguments through :meth:`ProcNexus.submit` and execute them in
     parallel through :meth:`ProcNexus.run`, or asynchronously through
-    :meth:`ProcNexus.start` and :meth:`ProcNexus.join`.
+    :meth:`ProcNexus.start`, :meth:`ProcNexus.join`, and :meth:`ProcNexus.get`.
 
     Parameters
     ----------
@@ -98,17 +98,12 @@ class ProcNexus[**P, T]:
 
         self._async_results.append(self._submit_to_pool(args, kwargs))
 
-    def start(self) -> Self:
+    def start(self) -> None:
         """
         Start executing queued tasks.
 
         With ``processes=0``, tasks are computed immediately in the current
         process. Otherwise, tasks are launched asynchronously in a process pool.
-
-        Returns
-        -------
-        Self
-            This scheduler, so callers can chain ``nexus(...).start().join()``.
 
         """
         if self._state != "pending":
@@ -120,7 +115,7 @@ class ProcNexus[**P, T]:
                 self.func(*args, **kwargs) for args, kwargs in self.params
             )
             self.params.clear()
-            return self
+            return
 
         processes = self.processes
         if processes < 0:
@@ -131,19 +126,15 @@ class ProcNexus[**P, T]:
             self._submit_to_pool(args, kwargs) for args, kwargs in self.params
         ]
         self.params.clear()
-        return self
+        return
 
-    def join(self) -> list[T]:
+    def join(self) -> None:
         """
-        Wait for asynchronous execution to finish and return task results.
+        Wait for asynchronous execution to finish.
 
         Results include every invocation submitted before this method is called,
-        including invocations submitted after :meth:`start`.
-
-        Returns
-        -------
-        list[T]
-            Results returned by each submitted invocation, in submission order.
+        including invocations submitted after :meth:`start`. Use :meth:`get` to
+        retrieve them.
 
         """
         if self._state == "pending":
@@ -153,13 +144,15 @@ class ProcNexus[**P, T]:
 
         self._state = "joined"
         if self.processes == 0:
-            return self._result
+            return
 
         if self._pool is None:
             raise RuntimeError("nexus is not running")
 
         try:
-            res = [async_result.get() for async_result in self._async_results]
+            self._result = [
+                async_result.get() for async_result in self._async_results
+            ]
         except BaseException:
             self._pool.terminate()
             raise
@@ -169,7 +162,25 @@ class ProcNexus[**P, T]:
             self._pool.join()
             self._pool = None
             self._async_results.clear()
-        return res
+        return
+
+    def get(self) -> list[T]:
+        """
+        Return task results in submission order.
+
+        If the nexus is still running, this waits for completion first.
+
+        Returns
+        -------
+        list[T]
+            Results returned by each submitted invocation, in submission order.
+
+        """
+        if self._state == "pending":
+            raise RuntimeError("cannot get results before start() has been called")
+        if self._state == "running":
+            self.join()
+        return self._result
 
     def _submit_to_pool(
         self, args: tuple[object, ...], kwargs: dict[str, object]
@@ -188,7 +199,9 @@ class ProcNexus[**P, T]:
             Results returned by each submitted invocation, in submission order.
 
         """
-        return self.start().join()
+        self.start()
+        self.join()
+        return self.get()
 
 
 def _invoke_func[**P, T](

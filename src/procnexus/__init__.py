@@ -13,7 +13,7 @@ $ pip install procnexus
 ## ✨ Features
 * Simple task submission (`submit`) API.
 * Batch execution with process pools.
-* Asynchronous execution with `start()` and `join()`
+* Asynchronous execution with `start()`, `join()`, and `get()`
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
 
@@ -41,7 +41,8 @@ job.submit(10, 5)
 job.start()
 # Do other work here, and optionally submit more tasks before joining.
 job.submit(-1, 8)
-results = job.join()
+job.join()
+results = job.get()
 print(results)  # [3, 15, 7]
 ```
 
@@ -57,25 +58,28 @@ Create a `ProcNexus` runner from a callable.
 ### `ProcNexus.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later
 execution. After `start()` and before `join()`, the invocation is scheduled immediately
-and is included in the ordered `join()` result.
+and is included in the ordered `get()` result.
 
-### `ProcNexus.start() -> ProcNexus`
-Start executing all queued tasks and return the current `ProcNexus` instance. With
-`processes=0`, this computes immediately in the current process; otherwise it starts a
-process pool asynchronously.
+### `ProcNexus.start() -> None`
+Start executing all queued tasks. With `processes=0`, this computes immediately in the
+current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join() -> list`
-Wait for a previously started run to finish and return results in submission order,
-including tasks submitted after `start()`.
+### `ProcNexus.join() -> None`
+Wait for a previously started run to finish. Results are stored on the runner instead
+of being returned directly.
+
+### `ProcNexus.get() -> list`
+Return results in submission order, including tasks submitted after `start()`. If the
+runner is still active, `get()` waits for it to finish before returning.
 
 ### `ProcNexus.run() -> list`
 Execute all queued tasks in parallel and return results in submission order. This is
-equivalent to `start().join()`.
+equivalent to calling `start()`, `join()`, and then `get()`.
 
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
 * Arguments must also be serializable for inter-process communication.
-* Exceptions from worker processes propagate when calling `join()` or `run()`.
+* Exceptions from worker processes propagate when calling `join()`, `get()`, or `run()`.
 
 ## 🔗 See Also
 ### Github repository
