@@ -52,7 +52,7 @@ print(job.run())  # [3, 15]
 ```
 
 ## 🧩 API
-### `nexus(func, processes=-1, threaded=False)`
+### `nexus(func, processes=-1, threaded=False) -> ParallelNexus`
 Create a process-backed runner or, with `threaded=True`, a thread-backed runner from a callable.
 * `func`: target function for each task.
 * `processes`: worker setting for the selected pool.
@@ -61,22 +61,22 @@ Create a process-backed runner or, with `threaded=True`, a thread-backed runner 
   * `> 0`: pass directly to `multiprocessing.Pool` or `multiprocessing.pool.ThreadPool`.
 * `threaded`: when `False`, use process workers; when `True`, use thread workers.
 
-### Runner behavior
+### `ParallelNexus`
 Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner uses processes, while `threaded=True` uses threads. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
 
-### `runner.submit(*args, **kwargs) -> None`
+### `submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
 
-### `runner.start() -> None`
+### `start() -> None`
 Start executing all queued tasks. With `processes=0`, this computes immediately in the current process; otherwise it starts the selected worker pool asynchronously.
 
-### `runner.join(timeout=None) -> None`
+### `join(timeout=None) -> None`
 Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For pooled runs, `timeout` is passed to each task result wait; if it expires, unfinished workers are terminated and `multiprocessing.TimeoutError` is raised.
 
-### `runner.get() -> list`
+### `get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
 
-### `runner.run() -> list`
+### `run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
@@ -96,9 +96,6 @@ Execute all currently queued tasks in parallel and return results in submission 
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
-### Unreleased
-* Added `threaded=True` to `nexus()` for creating runners backed by `multiprocessing.pool.ThreadPool`.
-
 ### v0.0.3
 * Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
 * Added `join(timeout=None)` support for process-pool runs, terminating unfinished workers and propagating `multiprocessing.TimeoutError` when a task wait expires.
