@@ -84,6 +84,8 @@ Execute all currently queued tasks in parallel and return results in submission 
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.3
+
 ### v0.0.2
 * Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
 * Updated process-pool `run()` execution to use `multiprocessing.Pool.starmap`, preserving ordered results and keyword-argument handling while keeping queued tasks available for a later async run.
