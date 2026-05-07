@@ -53,19 +53,19 @@ Create a `ProcNexus` runner from a callable.
   * `= 0`: do not create a process pool; run with normal in-process mapping.
   * `> 0`: pass directly to `multiprocessing.Pool`.
 
-### `ProcNexus.submit(self, *args, **kwargs) -> None`
+### `ProcNexus.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
 
-### `ProcNexus.start(self) -> None`
+### `ProcNexus.start() -> None`
 Start executing all queued tasks. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join(self, timeout=None) -> None`
+### `ProcNexus.join(timeout=None) -> None`
 Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For process-pool runs, `timeout` is passed to each task result wait; if it expires, unfinished workers are terminated and `multiprocessing.TimeoutError` is raised.
 
-### `ProcNexus.get(self) -> list`
+### `ProcNexus.get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
 
-### `ProcNexus.run(self) -> list`
+### `ProcNexus.run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
