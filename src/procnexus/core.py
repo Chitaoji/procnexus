@@ -6,36 +6,53 @@ NOTE: this module is private. All functions and objects are available in the mai
 
 """
 
-__all__ = ["nexus"]
+__all__ = ["nexus", "ProcNexus", "ThreadNexus"]
 
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from multiprocessing.pool import Pool as PoolType
+from multiprocessing.pool import ThreadPool
 from os import cpu_count
-from typing import Callable, Literal
+from typing import Callable, Literal, overload
 
 
-def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P, T]":
+@overload
+def nexus[**P, T](
+    func: Callable[P, T], *, processes: int = -1, threaded: Literal[False] = False
+) -> "ProcNexus[P, T]": ...
+
+
+@overload
+def nexus[**P, T](
+    func: Callable[P, T], *, processes: int = -1, threaded: Literal[True]
+) -> "ThreadNexus[P, T]": ...
+
+
+def nexus[**P, T](
+    func: Callable[P, T], *, processes: int = -1, threaded: bool = False
+) -> "ProcNexus[P, T] | ThreadNexus[P, T]":
     """
-    Create a ``ProcNexus`` scheduler for a callable.
+    Create a ``ProcNexus`` or ``ThreadNexus`` scheduler for a callable.
 
     This validates arguments and returns a scheduler instance that can collect
-    task arguments through :meth:`ProcNexus.submit` and execute them in
-    parallel through :meth:`ProcNexus.run`, or asynchronously through
-    :meth:`ProcNexus.start`, :meth:`ProcNexus.join`, and :meth:`ProcNexus.get`.
+    task arguments through ``submit`` and execute them in parallel through
+    ``run``, or asynchronously through ``start``, ``join``, and ``get``.
 
     Parameters
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
     processes : int, default=-1
-        Number of worker processes to use. This value is forwarded to
-        :class:`multiprocessing.Pool` when greater than zero. Negative values
-        use ``os.cpu_count()``; zero runs in-process.
+        Number of workers to use. This value is forwarded to the selected
+        pool implementation when greater than zero. Negative values use
+        ``os.cpu_count()``; zero runs in-process without creating a pool.
+    threaded : bool, default=False
+        When ``False``, create a process-based ``ProcNexus``. When ``True``,
+        create a thread-based ``ThreadNexus``.
 
     Returns
     -------
-    ProcNexus[P, T]
+    ProcNexus[P, T] | ThreadNexus[P, T]
         A scheduler bound to ``func``.
 
     """
@@ -43,8 +60,14 @@ def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P,
         raise TypeError(
             f"invalid type for processes: expected {int}, got {type(processes)} instead"
         )
+    if not isinstance(threaded, bool):
+        raise TypeError(
+            f"invalid type for threaded: expected {bool}, got {type(threaded)} instead"
+        )
     if not callable(func):
         raise TypeError(f"func should be callable, got {func} instead")
+    if threaded:
+        return ThreadNexus(func, processes=processes)
     return ProcNexus(func, processes=processes)
 
 
@@ -107,7 +130,8 @@ class ProcNexus[**P, T]:
         Start executing queued tasks.
 
         With ``processes=0``, tasks are computed immediately in the current
-        process. Otherwise, tasks are launched asynchronously in a process pool.
+        process. Otherwise, tasks are launched asynchronously in the selected
+        worker pool.
 
         """
         if self._state != "pending":
@@ -125,7 +149,7 @@ class ProcNexus[**P, T]:
         if processes < 0:
             processes = cpu_count() or 1
 
-        self._pool = Pool(processes=processes)
+        self._pool = self._create_pool(processes)
         self._async_results = [
             self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
             for args, kwargs in self.params
@@ -144,10 +168,9 @@ class ProcNexus[**P, T]:
         Parameters
         ----------
         timeout : float | None, default=None
-            Maximum number of seconds to wait for each process-pool task.
-            ``None`` waits indefinitely. When the timeout expires, unfinished
-            worker processes are terminated and ``multiprocessing.TimeoutError``
-            is raised.
+            Maximum number of seconds to wait for each pool task. ``None`` waits
+            indefinitely. When the timeout expires, unfinished workers are
+            terminated and ``multiprocessing.TimeoutError`` is raised.
 
         """
         if self._state == "pending":
@@ -220,11 +243,36 @@ class ProcNexus[**P, T]:
         if processes < 0:
             processes = cpu_count() or 1
 
-        with Pool(processes=processes) as pool:
+        with self._create_pool(processes) as pool:
             return pool.starmap(
                 _invoke_func,
                 ((self.func, args, kwargs) for args, kwargs in self.params),
             )
+
+    def _create_pool(self, processes: int) -> PoolType:
+        return Pool(processes=processes)
+
+
+class ThreadNexus[**P, T](ProcNexus[P, T]):
+    """
+    Queue and execute function calls via thread-based parallelism.
+
+    This has the same lifecycle and result-ordering behavior as
+    :class:`ProcNexus`, but it uses ``multiprocessing.pool.ThreadPool`` instead
+    of ``multiprocessing.Pool``. Thread workers share memory with the parent
+    process and do not require submitted callables or arguments to be picklable.
+
+    Parameters
+    ----------
+    func : Callable[P, T]
+        Callable executed for each submitted task.
+    processes : int
+        Number of worker threads used by ``multiprocessing.pool.ThreadPool``.
+
+    """
+
+    def _create_pool(self, processes: int) -> PoolType:
+        return ThreadPool(processes=processes)
 
 
 def _invoke_func[**P, T](

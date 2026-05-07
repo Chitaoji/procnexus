@@ -2,7 +2,7 @@ import unittest
 from multiprocessing import TimeoutError
 from time import sleep
 
-from src.procnexus import nexus
+from src.procnexus import ProcNexus, ThreadNexus, nexus
 
 
 def add(a: int, b: int) -> int:
@@ -15,6 +15,42 @@ def wait_then_return(seconds: float, value: int) -> int:
 
 
 class ProcNexusTests(unittest.TestCase):
+    def test_nexus_can_create_thread_nexus(self) -> None:
+        job = nexus(add, processes=2, threaded=True)
+        job.submit(1, 2)
+        job.submit(10, 5)
+
+        self.assertIsInstance(job, ThreadNexus)
+        self.assertEqual(job.run(), [3, 15])
+
+    def test_nexus_creates_proc_nexus_by_default(self) -> None:
+        job = nexus(add, processes=0)
+
+        self.assertIsInstance(job, ProcNexus)
+        self.assertNotIsInstance(job, ThreadNexus)
+
+    def test_thread_nexus_supports_non_picklable_callables(self) -> None:
+        offset = 5
+        job = nexus(lambda value: value + offset, processes=2, threaded=True)
+        job.submit(1)
+        job.submit(10)
+
+        self.assertEqual(job.run(), [6, 15])
+
+    def test_submit_after_start_with_thread_pool(self) -> None:
+        job = nexus(add, processes=2, threaded=True)
+        job.submit(1, 2)
+        self.assertIsNone(job.start())
+        job.submit(10, 5)
+        job.submit(-1, 8)
+
+        self.assertIsNone(job.join())
+        self.assertEqual(job.get(), [3, 15, 7])
+
+    def test_nexus_rejects_non_bool_threaded_option(self) -> None:
+        with self.assertRaisesRegex(TypeError, "invalid type for threaded"):
+            nexus(add, threaded=1)
+
     def test_submit_after_start_with_process_pool(self) -> None:
         job = nexus(add, processes=2)
         job.submit(1, 2)
