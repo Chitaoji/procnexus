@@ -1,10 +1,17 @@
 import unittest
+from multiprocessing import TimeoutError
+from time import sleep
 
 from src.procnexus import nexus
 
 
 def add(a: int, b: int) -> int:
     return a + b
+
+
+def wait_then_return(seconds: float, value: int) -> int:
+    sleep(seconds)
+    return value
 
 
 class ProcNexusTests(unittest.TestCase):
@@ -49,6 +56,23 @@ class ProcNexusTests(unittest.TestCase):
 
         self.assertIsNone(job.join())
         self.assertEqual(job.get(), [3])
+
+    def test_join_accepts_timeout_for_process_pool(self) -> None:
+        job = nexus(add, processes=2)
+        job.submit(1, 2)
+        job.submit(10, 5)
+        job.start()
+
+        self.assertIsNone(job.join(timeout=1))
+        self.assertEqual(job.get(), [3, 15])
+
+    def test_join_timeout_raises_for_process_pool(self) -> None:
+        job = nexus(wait_then_return, processes=1)
+        job.submit(1, 3)
+        job.start()
+
+        with self.assertRaises(TimeoutError):
+            job.join(timeout=0.01)
 
     def test_run_does_not_change_pending_state_or_consume_tasks(self) -> None:
         job = nexus(add, processes=0)

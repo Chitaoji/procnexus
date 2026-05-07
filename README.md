@@ -59,8 +59,8 @@ Queue one invocation of `func`. Before `start()`, the invocation is stored for l
 ### `ProcNexus.start()`
 Start executing all queued tasks. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join()`
-Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly.
+### `ProcNexus.join(timeout=None) -> None`
+Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For process-pool runs, `timeout` is passed to each task result wait; if it expires, unfinished workers are terminated and `multiprocessing.TimeoutError` is raised.
 
 ### `ProcNexus.get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
