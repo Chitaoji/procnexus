@@ -10,9 +10,8 @@ __all__ = ["nexus"]
 
 from abc import ABC, abstractmethod
 from multiprocessing import Pool
-from multiprocessing.pool import AsyncResult
+from multiprocessing.pool import AsyncResult, ThreadPool
 from multiprocessing.pool import Pool as PoolType
-from multiprocessing.pool import ThreadPool
 from os import cpu_count
 from typing import Callable, Literal, overload
 
@@ -29,9 +28,7 @@ def nexus[**P, T](
 ) -> "ThreadNexus[P, T]": ...
 
 
-def nexus[**P, T](
-    func: Callable[P, T], **options: int | None
-) -> "ParallelNexus[P, T]":
+def nexus[**P, T](func: Callable[P, T], **options: int | None) -> "ParallelNexus[P, T]":
     """
     Create a process-backed or thread-backed scheduler for a callable.
 
@@ -83,8 +80,7 @@ def nexus[**P, T](
 def _validate_worker_count(name: str, value: int | None) -> int | None:
     if not isinstance(value, int | None) or isinstance(value, bool):
         raise TypeError(
-            f"invalid type for {name}: "
-            f"expected {int | None}, got {type(value)} instead"
+            f"invalid type for {name}: expected {int | None}, got {type(value)} instead"
         )
     if value == 0:
         return None
@@ -294,14 +290,6 @@ class ThreadNexus[**P, T](ParallelNexus[P, T]):
     the process-backed runner, but it uses ``multiprocessing.pool.ThreadPool``
     instead of ``multiprocessing.Pool``. Thread workers share memory with the parent
     process and do not require submitted callables or arguments to be picklable.
-
-    Parameters
-    ----------
-    func : Callable[P, T]
-        Callable executed for each submitted task.
-    processes : int | None
-        Number of worker threads used by ``multiprocessing.pool.ThreadPool``,
-        or ``None`` to run in-process without creating a pool.
 
     """
 
