@@ -101,7 +101,12 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.3
-
+* Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
+* Added `join(timeout=None)` support for pooled runs, stopping unfinished work and propagating `multiprocessing.TimeoutError` when a task wait expires.
+* Added thread-backed execution through `threads`, with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
+* Changed `nexus()` selection so no worker option creates a sequential runner, while `processes` and `threads` explicitly select mutually exclusive pool-backed runners.
+* Normalized `0` worker counts to the sequential default, kept negative worker counts mapped to `os.cpu_count()`, and moved worker-count storage to pool-backed runners.
+* Refactored runner classes around the shared `ParallelNexus` lifecycle and renamed the in-process runner to `SequentialNexus`.
 
 ### v0.0.2
 * Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
