@@ -21,7 +21,7 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(procnexus.__all__, ["nexus"])
         self.assertIs(procnexus.nexus, nexus)
         self.assertFalse(hasattr(procnexus, "ParallelNexus"))
-        self.assertFalse(hasattr(procnexus, "SerialNexus"))
+        self.assertFalse(hasattr(procnexus, "SequentialNexus"))
         self.assertFalse(hasattr(procnexus, "ProcNexus"))
         self.assertFalse(hasattr(procnexus, "ThreadNexus"))
 
@@ -40,17 +40,17 @@ class NexusTests(unittest.TestCase):
         self.assertIsInstance(job, core.ThreadNexus)
         self.assertEqual(job.run(), [3, 15])
 
-    def test_nexus_creates_serial_nexus_by_default(self) -> None:
+    def test_nexus_creates_sequential_nexus_by_default(self) -> None:
         job = nexus(add)
 
-        self.assertIsInstance(job, core.SerialNexus)
+        self.assertIsInstance(job, core.SequentialNexus)
         self.assertNotIsInstance(job, core.ProcNexus)
         self.assertNotIsInstance(job, core.ThreadNexus)
 
-    def test_nexus_creates_serial_nexus_when_worker_counts_are_none(self) -> None:
+    def test_nexus_creates_sequential_nexus_when_worker_counts_are_none(self) -> None:
         job = nexus(add, processes=None, threads=None)
 
-        self.assertIsInstance(job, core.SerialNexus)
+        self.assertIsInstance(job, core.SequentialNexus)
         self.assertNotIsInstance(job, core.ProcNexus)
         self.assertNotIsInstance(job, core.ThreadNexus)
 
@@ -63,14 +63,14 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(job.run(), [3, 15])
 
     def test_nexus_classes_share_base_parent(self) -> None:
-        serial_job = nexus(add)
+        sequential_job = nexus(add)
         process_job = nexus(add, processes=2)
         thread_job = nexus(add, threads=2)
 
-        self.assertIsInstance(serial_job, core.ParallelNexus)
+        self.assertIsInstance(sequential_job, core.ParallelNexus)
         self.assertIsInstance(process_job, core.ParallelNexus)
         self.assertIsInstance(thread_job, core.ParallelNexus)
-        self.assertTrue(issubclass(core.SerialNexus, core.ParallelNexus))
+        self.assertTrue(issubclass(core.SequentialNexus, core.ParallelNexus))
         self.assertTrue(issubclass(core.ProcNexus, core.ParallelNexus))
         self.assertTrue(issubclass(core.ThreadNexus, core.ParallelNexus))
         self.assertFalse(issubclass(core.ThreadNexus, core.ProcNexus))
@@ -102,14 +102,14 @@ class NexusTests(unittest.TestCase):
             nexus(add, processes=2, threads=2)
 
     def test_nexus_normalizes_zero_worker_counts_before_selecting_runner(self) -> None:
-        serial_job = nexus(add, processes=0, threads=0)
+        sequential_job = nexus(add, processes=0, threads=0)
         process_job = nexus(add, processes=2, threads=0)
         thread_job = nexus(add, processes=0, threads=2)
 
-        self.assertIsInstance(serial_job, core.SerialNexus)
+        self.assertIsInstance(sequential_job, core.SequentialNexus)
         self.assertIsInstance(process_job, core.ProcNexus)
         self.assertIsInstance(thread_job, core.ThreadNexus)
-        self.assertFalse(hasattr(serial_job, "workers"))
+        self.assertFalse(hasattr(sequential_job, "workers"))
         self.assertEqual(process_job.workers, 2)
         self.assertEqual(thread_job.workers, 2)
 
