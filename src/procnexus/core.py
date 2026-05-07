@@ -6,8 +6,9 @@ NOTE: this module is private. All functions and objects are available in the mai
 
 """
 
-__all__ = ["nexus", "ProcNexus", "ThreadNexus"]
+__all__ = ["nexus"]
 
+from abc import ABC, abstractmethod
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from multiprocessing.pool import Pool as PoolType
@@ -19,20 +20,20 @@ from typing import Callable, Literal, overload
 @overload
 def nexus[**P, T](
     func: Callable[P, T], *, processes: int = -1, threaded: Literal[False] = False
-) -> "ProcNexus[P, T]": ...
+) -> "ParallelNexus[P, T]": ...
 
 
 @overload
 def nexus[**P, T](
     func: Callable[P, T], *, processes: int = -1, threaded: Literal[True]
-) -> "ThreadNexus[P, T]": ...
+) -> "ParallelNexus[P, T]": ...
 
 
 def nexus[**P, T](
     func: Callable[P, T], *, processes: int = -1, threaded: bool = False
-) -> "ProcNexus[P, T] | ThreadNexus[P, T]":
+) -> "ParallelNexus[P, T]":
     """
-    Create a ``ProcNexus`` or ``ThreadNexus`` scheduler for a callable.
+    Create a process-backed or thread-backed scheduler for a callable.
 
     This validates arguments and returns a scheduler instance that can collect
     task arguments through ``submit`` and execute them in parallel through
@@ -47,12 +48,12 @@ def nexus[**P, T](
         pool implementation when greater than zero. Negative values use
         ``os.cpu_count()``; zero runs in-process without creating a pool.
     threaded : bool, default=False
-        When ``False``, create a process-based ``ProcNexus``. When ``True``,
-        create a thread-based ``ThreadNexus``.
+        When ``False``, create a process-backed scheduler. When ``True``,
+        create a thread-backed scheduler.
 
     Returns
     -------
-    ProcNexus[P, T] | ThreadNexus[P, T]
+    ParallelNexus[P, T]
         A scheduler bound to ``func``.
 
     """
@@ -71,16 +72,20 @@ def nexus[**P, T](
     return ProcNexus(func, processes=processes)
 
 
-class ProcNexus[**P, T]:
+class ParallelNexus[**P, T](ABC):
     """
-    Queue and execute function calls via process-based parallelism.
+    Shared scheduler implementation for process-backed and thread-backed runners.
+
+    Subclasses provide the concrete pool implementation by overriding
+    :meth:`_create_pool`; the lifecycle, task queueing, and result ordering
+    behavior lives here so the concrete runners share one parent.
 
     Parameters
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
     processes : int
-        Number of worker processes used by ``multiprocessing.Pool``.
+        Number of workers used by the selected pool implementation.
 
     """
 
@@ -249,17 +254,25 @@ class ProcNexus[**P, T]:
                 ((self.func, args, kwargs) for args, kwargs in self.params),
             )
 
+    @abstractmethod
+    def _create_pool(self, processes: int) -> PoolType:
+        """Create the concrete worker pool used by this nexus."""
+
+
+class ProcNexus[**P, T](ParallelNexus[P, T]):
+    """Queue and execute function calls via process-based parallelism."""
+
     def _create_pool(self, processes: int) -> PoolType:
         return Pool(processes=processes)
 
 
-class ThreadNexus[**P, T](ProcNexus[P, T]):
+class ThreadNexus[**P, T](ParallelNexus[P, T]):
     """
     Queue and execute function calls via thread-based parallelism.
 
     This has the same lifecycle and result-ordering behavior as
-    :class:`ProcNexus`, but it uses ``multiprocessing.pool.ThreadPool`` instead
-    of ``multiprocessing.Pool``. Thread workers share memory with the parent
+    the process-backed runner, but it uses ``multiprocessing.pool.ThreadPool``
+    instead of ``multiprocessing.Pool``. Thread workers share memory with the parent
     process and do not require submitted callables or arguments to be picklable.
 
     Parameters
