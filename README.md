@@ -52,7 +52,7 @@ print(job.run())  # [3, 15]
 ```
 
 ## 🧩 API
-### `nexus(func, processes=None, threads=None) -> ParallelNexus`
+### `nexus(func, processes=None, threads=None) -> ProcNexus`
 Create a sequential runner by default, a process-backed runner with `processes`, or a thread-backed runner with `threads`.
 * `func`: target function for each task.
 * `processes`: process pool size setting.
@@ -63,10 +63,10 @@ Create a sequential runner by default, a process-backed runner with `processes`,
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
-* After normalizing `0` to `None`, exactly one non-`None` setting selects process-backed or thread-backed execution, two non-`None` settings raise `TypeError`, and two `None` settings select sequential execution.
+* After normalizing `0` to `None`, exactly one non-`None` setting selects `MultiProcNexus` or `MultiThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select sequential execution.
 
-### `ParallelNexus`
-Runners created by `nexus()` are subinstances of `ParallelNexus` who share the same lifecycle and ordered result behavior. The default runner is sequential; passing `processes` uses process-based concurrency, while passing `threads` uses thread-based concurrency. Threads share memory with the parent process, so the submitted callable and arguments do not need to be picklable.
+### `ProcNexus`
+Runners created by `nexus()` are subinstances of `ProcNexus` who share the same lifecycle and ordered result behavior. The default runner is sequential; passing `processes` uses process-based concurrency, while passing `threads` uses thread-based concurrency. Threads share memory with the parent process, so the submitted callable and arguments do not need to be picklable.
 
 ### `submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
@@ -101,9 +101,9 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.4
-* Added thread-backed execution through `ThreadNexus` with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
+* Added thread-backed execution through `MultiThreadNexus` with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
 * Changed `nexus()` selection so no worker option creates a sequential runner, while `processes` and `threads` explicitly select mutually exclusive pool-backed runners.
-* Refactored runner classes around the shared `ParallelNexus` lifecycle and renamed the in-process runner to `SequentialNexus`.
+* Refactored runner classes around the shared `ProcNexus` lifecycle and renamed the in-process runner to `SequentialNexus`.
 
 ### v0.0.3
 * Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.

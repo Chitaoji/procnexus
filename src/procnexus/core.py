@@ -25,20 +25,20 @@ def nexus[**P, T](
 @overload
 def nexus[**P, T](
     func: Callable[P, T], processes: int, threads: None = None
-) -> "ProcNexus[P, T]": ...
+) -> "MultiProcNexus[P, T]": ...
 
 
 @overload
 def nexus[**P, T](
     func: Callable[P, T], processes: None = None, threads: int = ...
-) -> "ThreadNexus[P, T]": ...
+) -> "MultiThreadNexus[P, T]": ...
 
 
 def nexus[**P, T](
     func: Callable[P, T],
     processes: int | None = None,
     threads: int | None = None,
-) -> "ParallelNexus[P, T]":
+) -> "ProcNexus[P, T]":
     """
     Create a sequential, process-backed, or thread-backed scheduler for a callable.
 
@@ -64,7 +64,7 @@ def nexus[**P, T](
 
     Returns
     -------
-    ParallelNexus[P, T]
+    ProcNexus[P, T]
         A scheduler bound to ``func``.
 
     """
@@ -78,9 +78,9 @@ def nexus[**P, T](
         raise TypeError("processes and threads are mutually exclusive")
 
     if threads is not None:
-        return ThreadNexus(func, workers=threads)
+        return MultiThreadNexus(func, workers=threads)
     if processes is not None:
-        return ProcNexus(func, workers=processes)
+        return MultiProcNexus(func, workers=processes)
     return SequentialNexus(func)
 
 
@@ -94,7 +94,7 @@ def _validate_worker_count(name: str, value: int | None) -> int | None:
     return value
 
 
-class ParallelNexus[**P, T](ABC):
+class ProcNexus[**P, T](ABC):
     """
     Shared interface and pool-backed scheduler implementation.
 
@@ -261,7 +261,7 @@ class ParallelNexus[**P, T](ABC):
         """Create the concrete worker pool used by this nexus."""
 
 
-class SequentialNexus[**P, T](ParallelNexus[P, T]):
+class SequentialNexus[**P, T](ProcNexus[P, T]):
     """Queue and execute function calls sequentially in the current process."""
 
     def __init__(self, func: Callable[P, T]) -> None:
@@ -305,14 +305,14 @@ class SequentialNexus[**P, T](ParallelNexus[P, T]):
         raise RuntimeError("sequential nexus does not create a worker pool")
 
 
-class ProcNexus[**P, T](ParallelNexus[P, T]):
+class MultiProcNexus[**P, T](ProcNexus[P, T]):
     """Queue and execute function calls via process-based parallelism."""
 
     def _create_pool(self, workers: int) -> PoolType:
         return Pool(processes=workers)
 
 
-class ThreadNexus[**P, T](ParallelNexus[P, T]):
+class MultiThreadNexus[**P, T](ProcNexus[P, T]):
     """Queue and execute function calls via thread-based parallelism."""
 
     def _create_pool(self, workers: int) -> PoolType:
