@@ -61,7 +61,7 @@ Create a sequential runner by default, a process-backed runner with `processes`,
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
-* After normalizing `0` to `None`, exactly one non-`None` worker setting selects `ProcNexus` or `ThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SequentialNexus`.
+* After normalizing `0` to `None`, exactly one non-`None` worker setting selects `MultiProcNexus` or `MultiThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SequentialNexus`.
 
 ### Runner behavior
 Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is sequential, and pool-backed runners store their normalized pool size as `workers`; process-backed runners get that value from `processes`, while thread-backed runners get it from `threads`. Sequential runners handle the in-process case separately without a `workers` value. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.

@@ -21,9 +21,18 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(procnexus.__all__, ["nexus"])
         self.assertIs(procnexus.nexus, nexus)
         self.assertFalse(hasattr(procnexus, "ParallelNexus"))
-        self.assertFalse(hasattr(procnexus, "SequentialNexus"))
         self.assertFalse(hasattr(procnexus, "ProcNexus"))
+        self.assertFalse(hasattr(procnexus, "SequentialNexus"))
         self.assertFalse(hasattr(procnexus, "ThreadNexus"))
+        self.assertFalse(hasattr(procnexus, "MultiProcNexus"))
+        self.assertFalse(hasattr(procnexus, "MultiThreadNexus"))
+
+    def test_core_renames_private_runner_classes(self) -> None:
+        self.assertFalse(hasattr(core, "ParallelNexus"))
+        self.assertFalse(hasattr(core, "ThreadNexus"))
+        self.assertTrue(hasattr(core, "ProcNexus"))
+        self.assertTrue(hasattr(core, "MultiProcNexus"))
+        self.assertTrue(hasattr(core, "MultiThreadNexus"))
 
     def test_nexus_has_explicit_worker_count_parameters(self) -> None:
         signature = inspect.signature(nexus)
@@ -32,34 +41,34 @@ class NexusTests(unittest.TestCase):
         self.assertIsNone(signature.parameters["processes"].default)
         self.assertIsNone(signature.parameters["threads"].default)
 
-    def test_nexus_can_create_thread_nexus(self) -> None:
+    def test_nexus_can_create_multi_thread_nexus(self) -> None:
         job = nexus(add, threads=2)
         job.submit(1, 2)
         job.submit(10, 5)
 
-        self.assertIsInstance(job, core.ThreadNexus)
+        self.assertIsInstance(job, core.MultiThreadNexus)
         self.assertEqual(job.run(), [3, 15])
 
     def test_nexus_creates_sequential_nexus_by_default(self) -> None:
         job = nexus(add)
 
         self.assertIsInstance(job, core.SequentialNexus)
-        self.assertNotIsInstance(job, core.ProcNexus)
-        self.assertNotIsInstance(job, core.ThreadNexus)
+        self.assertNotIsInstance(job, core.MultiProcNexus)
+        self.assertNotIsInstance(job, core.MultiThreadNexus)
 
     def test_nexus_creates_sequential_nexus_when_worker_counts_are_none(self) -> None:
         job = nexus(add, processes=None, threads=None)
 
         self.assertIsInstance(job, core.SequentialNexus)
-        self.assertNotIsInstance(job, core.ProcNexus)
-        self.assertNotIsInstance(job, core.ThreadNexus)
+        self.assertNotIsInstance(job, core.MultiProcNexus)
+        self.assertNotIsInstance(job, core.MultiThreadNexus)
 
-    def test_nexus_can_create_proc_nexus(self) -> None:
+    def test_nexus_can_create_multi_proc_nexus(self) -> None:
         job = nexus(add, processes=2)
         job.submit(1, 2)
         job.submit(10, 5)
 
-        self.assertIsInstance(job, core.ProcNexus)
+        self.assertIsInstance(job, core.MultiProcNexus)
         self.assertEqual(job.run(), [3, 15])
 
     def test_nexus_classes_share_base_parent(self) -> None:
@@ -67,15 +76,15 @@ class NexusTests(unittest.TestCase):
         process_job = nexus(add, processes=2)
         thread_job = nexus(add, threads=2)
 
-        self.assertIsInstance(sequential_job, core.ParallelNexus)
-        self.assertIsInstance(process_job, core.ParallelNexus)
-        self.assertIsInstance(thread_job, core.ParallelNexus)
-        self.assertTrue(issubclass(core.SequentialNexus, core.ParallelNexus))
-        self.assertTrue(issubclass(core.ProcNexus, core.ParallelNexus))
-        self.assertTrue(issubclass(core.ThreadNexus, core.ParallelNexus))
-        self.assertFalse(issubclass(core.ThreadNexus, core.ProcNexus))
+        self.assertIsInstance(sequential_job, core.ProcNexus)
+        self.assertIsInstance(process_job, core.ProcNexus)
+        self.assertIsInstance(thread_job, core.ProcNexus)
+        self.assertTrue(issubclass(core.SequentialNexus, core.ProcNexus))
+        self.assertTrue(issubclass(core.MultiProcNexus, core.ProcNexus))
+        self.assertTrue(issubclass(core.MultiThreadNexus, core.ProcNexus))
+        self.assertFalse(issubclass(core.MultiThreadNexus, core.MultiProcNexus))
 
-    def test_thread_nexus_supports_non_picklable_callables(self) -> None:
+    def test_multi_thread_nexus_supports_non_picklable_callables(self) -> None:
         offset = 5
         job = nexus(lambda value: value + offset, threads=2)
         job.submit(1)
@@ -107,8 +116,8 @@ class NexusTests(unittest.TestCase):
         thread_job = nexus(add, processes=0, threads=2)
 
         self.assertIsInstance(sequential_job, core.SequentialNexus)
-        self.assertIsInstance(process_job, core.ProcNexus)
-        self.assertIsInstance(thread_job, core.ThreadNexus)
+        self.assertIsInstance(process_job, core.MultiProcNexus)
+        self.assertIsInstance(thread_job, core.MultiThreadNexus)
         self.assertFalse(hasattr(sequential_job, "workers"))
         self.assertEqual(process_job.workers, 2)
         self.assertEqual(thread_job.workers, 2)
