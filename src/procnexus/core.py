@@ -18,39 +18,49 @@ from typing import Callable, Literal, overload
 
 @overload
 def nexus[**P, T](
-    func: Callable[P, T], *, processes: int | None = None
+    func: Callable[P, T], processes: None = None, threads: None = None
+) -> "SerialNexus[P, T]": ...
+
+
+@overload
+def nexus[**P, T](
+    func: Callable[P, T], processes: int, threads: None = None
 ) -> "ProcNexus[P, T]": ...
 
 
 @overload
 def nexus[**P, T](
-    func: Callable[P, T], *, threads: int | None = None
+    func: Callable[P, T], processes: None = None, threads: int = ...
 ) -> "ThreadNexus[P, T]": ...
 
 
-def nexus[**P, T](func: Callable[P, T], **options: int | None) -> "ParallelNexus[P, T]":
+def nexus[**P, T](
+    func: Callable[P, T],
+    processes: int | None = None,
+    threads: int | None = None,
+) -> "ParallelNexus[P, T]":
     """
-    Create a process-backed or thread-backed scheduler for a callable.
+    Create a serial, process-backed, or thread-backed scheduler for a callable.
 
     This validates arguments and returns a scheduler instance that can collect
-    task arguments through ``submit`` and execute them in parallel through
-    ``run``, or asynchronously through ``start``, ``join``, and ``get``.
+    task arguments through ``submit`` and execute them through ``run``, or
+    asynchronously through ``start``, ``join``, and ``get``.
 
     Parameters
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
     processes : int | None, default=None
-        Select a process-backed scheduler and configure its process pool.
+        Select a process-backed scheduler when non-``None`` after normalization.
         Positive values are forwarded to ``multiprocessing.Pool``. Negative
-        values use ``os.cpu_count()``. ``0`` and ``None`` run in-process
-        without creating a pool.
+        values use ``os.cpu_count()``. ``0`` is normalized to ``None``.
     threads : int | None, default=None
-        Select a thread-backed scheduler and configure its thread pool.
+        Select a thread-backed scheduler when non-``None`` after normalization.
         Positive values are forwarded to ``multiprocessing.pool.ThreadPool``.
-        Negative values use ``os.cpu_count()``. ``0`` and ``None`` run
-        in-process without creating a pool. This option is mutually exclusive
-        with ``processes``.
+        Negative values use ``os.cpu_count()``. ``0`` is normalized to
+        ``None``. If both worker settings normalize to ``None``, a serial
+        scheduler is used. If both normalize to non-``None``, ``TypeError`` is
+        raised.
 
     Returns
     -------
@@ -61,20 +71,17 @@ def nexus[**P, T](func: Callable[P, T], **options: int | None) -> "ParallelNexus
     if not callable(func):
         raise TypeError(f"func should be callable, got {func} instead")
 
-    unexpected = set(options) - {"processes", "threads"}
-    if unexpected:
-        name = next(iter(unexpected))
-        raise TypeError(f"nexus() got an unexpected keyword argument {name!r}")
+    processes = _validate_worker_count("processes", processes)
+    threads = _validate_worker_count("threads", threads)
 
-    if "processes" in options and "threads" in options:
+    if processes is not None and threads is not None:
         raise TypeError("processes and threads are mutually exclusive")
 
-    if "threads" in options:
-        threads = _validate_worker_count("threads", options["threads"])
+    if threads is not None:
         return ThreadNexus(func, processes=threads)
-
-    processes = _validate_worker_count("processes", options.get("processes"))
-    return ProcNexus(func, processes=processes)
+    if processes is not None:
+        return ProcNexus(func, processes=processes)
+    return SerialNexus(func)
 
 
 def _validate_worker_count(name: str, value: int | None) -> int | None:
@@ -89,9 +96,10 @@ def _validate_worker_count(name: str, value: int | None) -> int | None:
 
 class ParallelNexus[**P, T](ABC):
     """
-    Shared scheduler implementation for process-backed and thread-backed runners.
+    Shared scheduler implementation for serial, process-backed, and
+    thread-backed runners.
 
-    Subclasses provide the concrete pool implementation by overriding
+    Pool-backed subclasses provide the concrete pool implementation by overriding
     :meth:`_create_pool`; the lifecycle, task queueing, and result ordering
     behavior lives here so the concrete runners share one parent.
 
@@ -150,9 +158,9 @@ class ParallelNexus[**P, T](ABC):
         """
         Start executing queued tasks.
 
-        With ``processes=None`` or ``threads=None``, tasks are computed
-        immediately in the current process. Otherwise, tasks are launched
-        asynchronously in the selected worker pool.
+        Serial runners compute tasks immediately in the current process.
+        Pool-backed runners launch tasks asynchronously in the selected worker
+        pool.
 
         """
         if self._state != "pending":
@@ -273,6 +281,16 @@ class ParallelNexus[**P, T](ABC):
     @abstractmethod
     def _create_pool(self, processes: int) -> PoolType:
         """Create the concrete worker pool used by this nexus."""
+
+
+class SerialNexus[**P, T](ParallelNexus[P, T]):
+    """Queue and execute function calls sequentially in the current process."""
+
+    def __init__(self, func: Callable[P, T]) -> None:
+        super().__init__(func, processes=None)
+
+    def _create_pool(self, processes: int) -> PoolType:
+        raise RuntimeError("serial nexus does not create a worker pool")
 
 
 class ProcNexus[**P, T](ParallelNexus[P, T]):
