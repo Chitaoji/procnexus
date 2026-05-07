@@ -100,6 +100,8 @@ Execute all currently queued tasks in parallel and return results in submission 
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.5
+
 ### v0.0.4
 * Added thread-backed execution through `MultiThreadNexus` with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
 * Changed `nexus()` selection so no worker option creates a sequential runner, while `processes` and `threads` explicitly select mutually exclusive pool-backed runners.
