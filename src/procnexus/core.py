@@ -19,18 +19,18 @@ from typing import Callable, Literal, overload
 
 @overload
 def nexus[**P, T](
-    func: Callable[P, T], *, processes: int = -1, threaded: Literal[False] = False
-) -> "ParallelNexus[P, T]": ...
+    func: Callable[P, T], *, processes: int | None = None
+) -> "ProcNexus[P, T]": ...
 
 
 @overload
 def nexus[**P, T](
-    func: Callable[P, T], *, processes: int = -1, threaded: Literal[True]
-) -> "ParallelNexus[P, T]": ...
+    func: Callable[P, T], *, threads: int | None = None
+) -> "ThreadNexus[P, T]": ...
 
 
 def nexus[**P, T](
-    func: Callable[P, T], *, processes: int = -1, threaded: bool = False
+    func: Callable[P, T], **options: int | None
 ) -> "ParallelNexus[P, T]":
     """
     Create a process-backed or thread-backed scheduler for a callable.
@@ -43,13 +43,17 @@ def nexus[**P, T](
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
-    processes : int, default=-1
-        Number of workers to use. This value is forwarded to the selected
-        pool implementation when greater than zero. Negative values use
-        ``os.cpu_count()``; zero runs in-process without creating a pool.
-    threaded : bool, default=False
-        When ``False``, create a process-backed scheduler. When ``True``,
-        create a thread-backed scheduler.
+    processes : int | None, default=None
+        Select a process-backed scheduler and configure its process pool.
+        Positive values are forwarded to ``multiprocessing.Pool``. Negative
+        values use ``os.cpu_count()``. ``0`` and ``None`` run in-process
+        without creating a pool.
+    threads : int | None, default=None
+        Select a thread-backed scheduler and configure its thread pool.
+        Positive values are forwarded to ``multiprocessing.pool.ThreadPool``.
+        Negative values use ``os.cpu_count()``. ``0`` and ``None`` run
+        in-process without creating a pool. This option is mutually exclusive
+        with ``processes``.
 
     Returns
     -------
@@ -57,19 +61,34 @@ def nexus[**P, T](
         A scheduler bound to ``func``.
 
     """
-    if not isinstance(processes, int):
-        raise TypeError(
-            f"invalid type for processes: expected {int}, got {type(processes)} instead"
-        )
-    if not isinstance(threaded, bool):
-        raise TypeError(
-            f"invalid type for threaded: expected {bool}, got {type(threaded)} instead"
-        )
     if not callable(func):
         raise TypeError(f"func should be callable, got {func} instead")
-    if threaded:
-        return ThreadNexus(func, processes=processes)
+
+    unexpected = set(options) - {"processes", "threads"}
+    if unexpected:
+        name = next(iter(unexpected))
+        raise TypeError(f"nexus() got an unexpected keyword argument {name!r}")
+
+    if "processes" in options and "threads" in options:
+        raise TypeError("processes and threads are mutually exclusive")
+
+    if "threads" in options:
+        threads = _validate_worker_count("threads", options["threads"])
+        return ThreadNexus(func, processes=threads)
+
+    processes = _validate_worker_count("processes", options.get("processes"))
     return ProcNexus(func, processes=processes)
+
+
+def _validate_worker_count(name: str, value: int | None) -> int | None:
+    if not isinstance(value, int | None) or isinstance(value, bool):
+        raise TypeError(
+            f"invalid type for {name}: "
+            f"expected {int | None}, got {type(value)} instead"
+        )
+    if value == 0:
+        return None
+    return value
 
 
 class ParallelNexus[**P, T](ABC):
@@ -84,12 +103,13 @@ class ParallelNexus[**P, T](ABC):
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
-    processes : int
-        Number of workers used by the selected pool implementation.
+    processes : int | None
+        Number of workers used by the selected pool implementation, or ``None``
+        to run in-process without creating a pool.
 
     """
 
-    def __init__(self, func: Callable[P, T], *, processes: int) -> None:
+    def __init__(self, func: Callable[P, T], *, processes: int | None) -> None:
         self.func = func
         self.processes = processes
         self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -120,7 +140,7 @@ class ParallelNexus[**P, T](ABC):
             self.params.append((args, kwargs))
             return
 
-        if self.processes == 0:
+        if self.processes is None:
             self._result.append(self.func(*args, **kwargs))
             return
 
@@ -134,16 +154,16 @@ class ParallelNexus[**P, T](ABC):
         """
         Start executing queued tasks.
 
-        With ``processes=0``, tasks are computed immediately in the current
-        process. Otherwise, tasks are launched asynchronously in the selected
-        worker pool.
+        With ``processes=None`` or ``threads=None``, tasks are computed
+        immediately in the current process. Otherwise, tasks are launched
+        asynchronously in the selected worker pool.
 
         """
         if self._state != "pending":
             raise RuntimeError("cannot start a nexus that has already started")
 
         self._state = "running"
-        if self.processes == 0:
+        if self.processes is None:
             self._result.extend(
                 self.func(*args, **kwargs) for args, kwargs in self.params
             )
@@ -184,7 +204,7 @@ class ParallelNexus[**P, T](ABC):
             raise RuntimeError("cannot join a nexus more than once")
 
         self._state = "joined"
-        if self.processes == 0:
+        if self.processes is None:
             return
 
         if self._pool is None:
@@ -241,7 +261,7 @@ class ParallelNexus[**P, T](ABC):
         if self._state != "pending":
             raise RuntimeError("cannot run a nexus that has already started")
 
-        if self.processes == 0:
+        if self.processes is None:
             return [self.func(*args, **kwargs) for args, kwargs in self.params]
 
         processes = self.processes
@@ -279,8 +299,9 @@ class ThreadNexus[**P, T](ParallelNexus[P, T]):
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
-    processes : int
-        Number of worker threads used by ``multiprocessing.pool.ThreadPool``.
+    processes : int | None
+        Number of worker threads used by ``multiprocessing.pool.ThreadPool``,
+        or ``None`` to run in-process without creating a pool.
 
     """
 
