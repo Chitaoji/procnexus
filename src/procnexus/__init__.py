@@ -51,7 +51,7 @@ print(job.run())  # [3, 15]
 
 ## 🧩 API
 ### `nexus(func, processes=None, threads=None)`
-Create a serial runner by default, a process-backed runner with `processes`, or a thread-backed runner with `threads`.
+Create a sequential runner by default, a process-backed runner with `processes`, or a thread-backed runner with `threads`.
 * `func`: target function for each task.
 * `processes`: process worker setting.
   * `< 0`: use `os.cpu_count()`.
@@ -61,10 +61,10 @@ Create a serial runner by default, a process-backed runner with `processes`, or 
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
-* After normalizing `0` to `None`, exactly one non-`None` worker setting selects `ProcNexus` or `ThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SerialNexus`.
+* After normalizing `0` to `None`, exactly one non-`None` worker setting selects `ProcNexus` or `ThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SequentialNexus`.
 
 ### Runner behavior
-Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is serial, and pool-backed runners store their normalized pool size as `workers`; process-backed runners get that value from `processes`, while thread-backed runners get it from `threads`. Serial runners handle the in-process case separately without a `workers` value. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
+Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is sequential, and pool-backed runners store their normalized pool size as `workers`; process-backed runners get that value from `processes`, while thread-backed runners get it from `threads`. Sequential runners handle the in-process case separately without a `workers` value. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
 
 ### `runner.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later
@@ -72,7 +72,7 @@ execution. After `start()` and before `join()`, the invocation is scheduled imme
 and is included in the ordered `get()` result.
 
 ### `runner.start() -> None`
-Start executing all queued tasks. Serial runners compute immediately in the current
+Start executing all queued tasks. Sequential runners compute immediately in the current
 process; process- and thread-backed runners start the selected worker pool
 asynchronously.
 
