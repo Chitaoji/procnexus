@@ -42,26 +42,30 @@ job.join()
 results = job.get()
 print(results)  # [3, 15, 7]
 
-# Use threaded=True to run with threads instead of processes.
-job = nexus(add, processes=4, threaded=True)
+# Use threads=... to run with threads instead of processes.
+job = nexus(add, threads=4)
 job.submit(1, 2)
 job.submit(10, 5)
 print(job.run())  # [3, 15]
 ```
 
 ## 🧩 API
-### `nexus(func, processes=-1, threaded=False)`
-Create a process-backed runner or, with `threaded=True`, a thread-backed
-runner from a callable.
+### `nexus(func, processes=None)`
+### `nexus(func, threads=None)`
+Create a process-backed runner with `processes` or a thread-backed runner with `threads`.
 * `func`: target function for each task.
-* `processes`: worker setting for the selected pool.
+* `processes`: process worker setting.
   * `< 0`: use `os.cpu_count()`.
-  * `= 0`: do not create a pool; run with normal in-process mapping.
-  * `> 0`: pass directly to `multiprocessing.Pool` or `multiprocessing.pool.ThreadPool`.
-* `threaded`: when `False`, use process workers; when `True`, use thread workers.
+  * `0` or `None`: do not create a pool; run with normal in-process mapping.
+  * `> 0`: pass directly to `multiprocessing.Pool`.
+* `threads`: thread worker setting. Passing this option selects `ThreadNexus`.
+  * `< 0`: use `os.cpu_count()`.
+  * `0` or `None`: do not create a pool; run with normal in-process mapping.
+  * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
+* `processes` and `threads` are mutually exclusive.
 
 ### Runner behavior
-Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner uses processes, while `threaded=True` uses threads. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
+Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner uses processes, while passing `threads` uses threads. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
 
 ### `runner.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later
@@ -69,8 +73,9 @@ execution. After `start()` and before `join()`, the invocation is scheduled imme
 and is included in the ordered `get()` result.
 
 ### `runner.start() -> None`
-Start executing all queued tasks. With `processes=0`, this computes immediately in the
-current process; otherwise it starts the selected worker pool asynchronously.
+Start executing all queued tasks. With `processes=0`, `processes=None`, `threads=0`, or `threads=None`, this computes
+immediately in the current process; otherwise it starts the selected worker pool
+asynchronously.
 
 ### `runner.join(timeout=None) -> None`
 Wait for a previously started run to finish. Results are stored on the runner instead of

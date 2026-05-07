@@ -24,7 +24,7 @@ class NexusTests(unittest.TestCase):
         self.assertFalse(hasattr(procnexus, "ThreadNexus"))
 
     def test_nexus_can_create_thread_nexus(self) -> None:
-        job = nexus(add, processes=2, threaded=True)
+        job = nexus(add, threads=2)
         job.submit(1, 2)
         job.submit(10, 5)
 
@@ -32,14 +32,14 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(job.run(), [3, 15])
 
     def test_nexus_creates_proc_nexus_by_default(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add)
 
         self.assertIsInstance(job, core.ProcNexus)
         self.assertNotIsInstance(job, core.ThreadNexus)
 
     def test_proc_and_thread_nexus_share_base_parent(self) -> None:
-        process_job = nexus(add, processes=0)
-        thread_job = nexus(add, processes=0, threaded=True)
+        process_job = nexus(add, processes=None)
+        thread_job = nexus(add, threads=None)
 
         self.assertIsInstance(process_job, core.ParallelNexus)
         self.assertIsInstance(thread_job, core.ParallelNexus)
@@ -49,14 +49,14 @@ class NexusTests(unittest.TestCase):
 
     def test_thread_nexus_supports_non_picklable_callables(self) -> None:
         offset = 5
-        job = nexus(lambda value: value + offset, processes=2, threaded=True)
+        job = nexus(lambda value: value + offset, threads=2)
         job.submit(1)
         job.submit(10)
 
         self.assertEqual(job.run(), [6, 15])
 
     def test_submit_after_start_with_thread_pool(self) -> None:
-        job = nexus(add, processes=2, threaded=True)
+        job = nexus(add, threads=2)
         job.submit(1, 2)
         self.assertIsNone(job.start())
         job.submit(10, 5)
@@ -65,9 +65,22 @@ class NexusTests(unittest.TestCase):
         self.assertIsNone(job.join())
         self.assertEqual(job.get(), [3, 15, 7])
 
-    def test_nexus_rejects_non_bool_threaded_option(self) -> None:
-        with self.assertRaisesRegex(TypeError, "invalid type for threaded"):
-            nexus(add, threaded=1)
+    def test_nexus_rejects_non_int_or_none_threads_option(self) -> None:
+        with self.assertRaisesRegex(TypeError, "invalid type for threads"):
+            nexus(add, threads="2")
+
+    def test_nexus_rejects_processes_with_threads_option(self) -> None:
+        with self.assertRaisesRegex(TypeError, "mutually exclusive"):
+            nexus(add, processes=2, threads=2)
+
+    def test_nexus_treats_zero_worker_count_as_in_process(self) -> None:
+        process_job = nexus(add, processes=0)
+        thread_job = nexus(add, threads=0)
+
+        self.assertIsInstance(process_job, core.ProcNexus)
+        self.assertIsInstance(thread_job, core.ThreadNexus)
+        self.assertIsNone(process_job.processes)
+        self.assertIsNone(thread_job.processes)
 
     def test_submit_after_start_with_process_pool(self) -> None:
         job = nexus(add, processes=2)
@@ -80,7 +93,7 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(job.get(), [3, 15, 7])
 
     def test_submit_after_start_in_process(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add, processes=None)
         job.submit(1, 2)
         self.assertIsNone(job.start())
         job.submit(10, 5)
@@ -101,7 +114,7 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(job.get(), [3])
 
     def test_get_while_running_in_process_is_rejected(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add, processes=None)
         job.submit(1, 2)
         job.start()
 
@@ -129,7 +142,7 @@ class NexusTests(unittest.TestCase):
             job.join(timeout=0.01)
 
     def test_run_does_not_change_pending_state_or_consume_tasks(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add, processes=None)
         job.submit(1, 2)
         job.submit(10, 5)
 
@@ -159,20 +172,20 @@ class NexusTests(unittest.TestCase):
         self.assertEqual(job.run(), [3, 15])
 
     def test_run_after_start_is_rejected(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add, processes=None)
         job.start()
 
         with self.assertRaisesRegex(RuntimeError, "cannot run a nexus"):
             job.run()
 
     def test_get_before_start_is_rejected(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add, processes=None)
 
         with self.assertRaisesRegex(RuntimeError, "cannot get results before"):
             job.get()
 
     def test_submit_after_join_is_rejected(self) -> None:
-        job = nexus(add, processes=0)
+        job = nexus(add, processes=None)
         job.start()
         job.join()
 
