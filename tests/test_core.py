@@ -109,9 +109,9 @@ class NexusTests(unittest.TestCase):
         self.assertIsInstance(serial_job, core.SerialNexus)
         self.assertIsInstance(process_job, core.ProcNexus)
         self.assertIsInstance(thread_job, core.ThreadNexus)
-        self.assertIsNone(serial_job.processes)
-        self.assertEqual(process_job.processes, 2)
-        self.assertEqual(thread_job.processes, 2)
+        self.assertFalse(hasattr(serial_job, "workers"))
+        self.assertEqual(process_job.workers, 2)
+        self.assertEqual(thread_job.workers, 2)
 
     def test_submit_after_start_with_process_pool(self) -> None:
         job = nexus(add, processes=2)
