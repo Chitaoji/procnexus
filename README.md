@@ -85,6 +85,9 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.3
+* Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
+* Added `join(timeout=None)` support for process-pool runs, terminating unfinished workers and propagating `multiprocessing.TimeoutError` when a task wait expires.
+* Simplified process-pool task scheduling by inlining `apply_async` usage and refreshed API documentation signatures for bound methods.
 
 ### v0.0.2
 * Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.

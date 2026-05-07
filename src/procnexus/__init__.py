@@ -64,9 +64,11 @@ and is included in the ordered `get()` result.
 Start executing all queued tasks. With `processes=0`, this computes immediately in the
 current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join() -> None`
+### `ProcNexus.join(timeout=None) -> None`
 Wait for a previously started run to finish. Results are stored on the runner instead
-of being returned directly.
+of being returned directly. For process-pool runs, `timeout` is passed to each task
+result wait; if it expires, unfinished workers are terminated and
+`multiprocessing.TimeoutError` is raised.
 
 ### `ProcNexus.get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the
@@ -93,6 +95,11 @@ submitted tasks queued, so it can be called repeatedly before `start()`.
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.3
+* Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
+* Added `join(timeout=None)` support for process-pool runs, terminating unfinished workers and propagating `multiprocessing.TimeoutError` when a task wait expires.
+* Simplified process-pool task scheduling by inlining `apply_async` usage and refreshed API documentation signatures for bound methods.
+
 ### v0.0.2
 * Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
 * Updated process-pool `run()` execution to use `multiprocessing.Pool.starmap`, preserving ordered results and keyword-argument handling while keeping queued tasks available for a later async run.
