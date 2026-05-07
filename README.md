@@ -66,7 +66,7 @@ Create a sequential runner by default, a process-backed runner with `processes`,
 * After normalizing `0` to `None`, exactly one non-`None` setting selects process-backed or thread-backed execution, two non-`None` settings raise `TypeError`, and two `None` settings select sequential execution.
 
 ### `ParallelNexus`
-Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is sequential; passing `processes` uses process-based concurrency, while passing `threads` uses thread-based concurrency. Threads share memory with the parent process, so the submitted callable and arguments do not need to be picklable.
+Runners created by `nexus()` are subinstances of `ParallelNexus` who share the same lifecycle and ordered result behavior. The default runner is sequential; passing `processes` uses process-based concurrency, while passing `threads` uses thread-based concurrency. Threads share memory with the parent process, so the submitted callable and arguments do not need to be picklable.
 
 ### `submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
