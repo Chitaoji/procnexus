@@ -64,7 +64,7 @@ Create a serial runner by default, a process-backed runner with `processes`, or 
 * After normalizing `0` to `None`, exactly one non-`None` worker setting selects `ProcNexus` or `ThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SerialNexus`.
 
 ### Runner behavior
-Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is serial, a non-`None` normalized `processes` value uses processes, and a non-`None` normalized `threads` value uses threads. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
+Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is serial, and pool-backed runners store their normalized pool size as `workers`; process-backed runners get that value from `processes`, while thread-backed runners get it from `threads`. Serial runners handle the in-process case separately without a `workers` value. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
 
 ### `runner.submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later
