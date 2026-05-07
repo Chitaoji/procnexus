@@ -30,6 +30,13 @@ else:
     long_description = SUMMARY
 
 
+def _normalized_readme_heading(section: str) -> str:
+    """Return a README heading name without decorative leading/trailing icons."""
+    match = re.search(r"^##\s+(.*?)\s*$", section, flags=re.MULTILINE)
+    heading = match.group(1) if match else section.lstrip().partition("\n")[0]
+    return re.sub(r"^[^\w]+|[^\w]+$", "", heading).strip()
+
+
 def _readme2doc(
     readme: str,
     name: str = NAME,
@@ -39,13 +46,13 @@ def _readme2doc(
 ) -> tuple[str, str]:
     doc, rd = "", ""
     for i, s in enumerate(rsplit("\n## ", readme)):
-        head = re.search(" .*\n", s).group()[1:-1]
+        head = _normalized_readme_heading(s)
         if i == 0:
             s = re.sub("^\n# .*", f"\n# {name}", s)
         elif head == "Requirements":
             s = re.sub(
                 "```txt.*```",
-                "```txt\n" + "\n".join(requires) + "\n```",
+                "```txt\n" + ", ".join(requires) + "\n```",
                 s,
                 flags=re.DOTALL,
             )
@@ -65,7 +72,12 @@ def _readme2doc(
                 ),
             )
         elif head == "License":
-            s = f"\n## License\nThis project falls under the {pkg_license}.\n"
+            s = re.sub(
+                r"This project falls under the .*\n",
+                f"This project falls under the {pkg_license}.\n",
+                s,
+                flags=re.DOTALL | re.MULTILINE,
+            )
 
         rd += s
         if head not in {"Installation", "Requirements", "History"}:
