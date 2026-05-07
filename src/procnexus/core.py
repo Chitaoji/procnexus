@@ -150,9 +150,7 @@ class ProcNexus[**P, T]:
             raise RuntimeError("nexus is not running")
 
         try:
-            self._result = [
-                async_result.get() for async_result in self._async_results
-            ]
+            self._result = [async_result.get() for async_result in self._async_results]
         except BaseException:
             self._pool.terminate()
             raise
@@ -208,9 +206,7 @@ class ProcNexus[**P, T]:
             raise RuntimeError("cannot run a nexus that has already started")
 
         if self.processes == 0:
-            return [
-                self.func(*args, **kwargs) for args, kwargs in self.params
-            ]
+            return [self.func(*args, **kwargs) for args, kwargs in self.params]
 
         processes = self.processes
         if processes < 0:
@@ -219,10 +215,7 @@ class ProcNexus[**P, T]:
         with Pool(processes=processes) as pool:
             return pool.starmap(
                 _invoke_func,
-                (
-                    (self.func, args, kwargs)
-                    for args, kwargs in self.params
-                ),
+                ((self.func, args, kwargs) for args, kwargs in self.params),
             )
 
 

@@ -53,13 +53,13 @@ Create a `ProcNexus` runner from a callable.
   * `= 0`: do not create a process pool; run with normal in-process mapping.
   * `> 0`: pass directly to `multiprocessing.Pool`.
 
-### `ProcNexus.submit(*args, **kwargs) -> None`
+### `ProcNexus.submit(*args, **kwargs)`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
 
-### `ProcNexus.start() -> None`
+### `ProcNexus.start()`
 Start executing all queued tasks. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join() -> None`
+### `ProcNexus.join()`
 Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly.
 
 ### `ProcNexus.get() -> list`
