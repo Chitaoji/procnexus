@@ -19,7 +19,7 @@ from typing import Callable, Literal, overload
 @overload
 def nexus[**P, T](
     func: Callable[P, T], processes: None = None, threads: None = None
-) -> "SerialNexus[P, T]": ...
+) -> "SequentialNexus[P, T]": ...
 
 
 @overload
@@ -40,7 +40,7 @@ def nexus[**P, T](
     threads: int | None = None,
 ) -> "ParallelNexus[P, T]":
     """
-    Create a serial, process-backed, or thread-backed scheduler for a callable.
+    Create a sequential, process-backed, or thread-backed scheduler for a callable.
 
     This validates arguments and returns a scheduler instance that can collect
     task arguments through ``submit`` and execute them through ``run``, or
@@ -58,7 +58,7 @@ def nexus[**P, T](
         Select a thread-backed scheduler when non-``None`` after normalization.
         Positive values are forwarded to ``multiprocessing.pool.ThreadPool``.
         Negative values use ``os.cpu_count()``. ``0`` is normalized to
-        ``None``. If both worker settings normalize to ``None``, a serial
+        ``None``. If both worker settings normalize to ``None``, a sequential
         scheduler is used. If both normalize to non-``None``, ``TypeError`` is
         raised.
 
@@ -81,7 +81,7 @@ def nexus[**P, T](
         return ThreadNexus(func, workers=threads)
     if processes is not None:
         return ProcNexus(func, workers=processes)
-    return SerialNexus(func)
+    return SequentialNexus(func)
 
 
 def _validate_worker_count(name: str, value: int | None) -> int | None:
@@ -100,7 +100,7 @@ class ParallelNexus[**P, T](ABC):
 
     Pool-backed subclasses provide the concrete pool implementation by overriding
     :meth:`_create_pool`; the lifecycle, task queueing, and result ordering
-    behavior lives here for workers-backed runners. ``SerialNexus`` handles the
+    behavior lives here for workers-backed runners. ``SequentialNexus`` handles the
     in-process execution case separately.
 
     Parameters
@@ -261,7 +261,7 @@ class ParallelNexus[**P, T](ABC):
         """Create the concrete worker pool used by this nexus."""
 
 
-class SerialNexus[**P, T](ParallelNexus[P, T]):
+class SequentialNexus[**P, T](ParallelNexus[P, T]):
     """Queue and execute function calls sequentially in the current process."""
 
     def __init__(self, func: Callable[P, T]) -> None:
@@ -304,7 +304,7 @@ class SerialNexus[**P, T](ParallelNexus[P, T]):
         return [self.func(*args, **kwargs) for args, kwargs in self.params]
 
     def _create_pool(self, workers: int) -> PoolType:
-        raise RuntimeError("serial nexus does not create a worker pool")
+        raise RuntimeError("sequential nexus does not create a worker pool")
 
 
 class ProcNexus[**P, T](ParallelNexus[P, T]):
