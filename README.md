@@ -59,11 +59,11 @@ Queue one invocation of `func`. Before `start()`, the invocation is stored for l
 ### `ProcNexus.start() -> None`
 Start executing all queued tasks. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join() -> None`
-Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly.
+### `ProcNexus.join(timeout=None) -> None`
+Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For process-pool runs, `timeout` is passed to each task result wait; if it expires, unfinished workers are terminated and `multiprocessing.TimeoutError` is raised.
 
 ### `ProcNexus.get() -> list`
-Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` waits for it to finish before returning.
+Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
 
 ### `ProcNexus.run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
@@ -71,7 +71,7 @@ Execute all currently queued tasks in parallel and return results in submission 
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
 * Arguments must also be serializable for inter-process communication.
-* Exceptions from worker processes propagate when calling `join()`, `get()`, or `run()`.
+* Exceptions from worker processes propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
@@ -84,6 +84,10 @@ Execute all currently queued tasks in parallel and return results in submission 
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.3
+* Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
+* Added `join(timeout=None)` support for process-pool runs, terminating unfinished workers and propagating `multiprocessing.TimeoutError` when a task wait expires.
+
 ### v0.0.2
 * Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
 * Updated process-pool `run()` execution to use `multiprocessing.Pool.starmap`, preserving ordered results and keyword-argument handling while keeping queued tasks available for a later async run.

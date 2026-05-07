@@ -5,11 +5,6 @@ Provides tools for multiprocessing.
 `procnexus` offers a tiny, explicit interface for collecting function calls and
 executing them concurrently with Python's `multiprocessing.Pool`.
 
-## 🛠️ Installation
-```sh
-$ pip install procnexus
-```
-
 ## ✨ Features
 * Simple task submission (`submit`) API.
 * Batch execution with process pools.
@@ -64,13 +59,16 @@ and is included in the ordered `get()` result.
 Start executing all queued tasks. With `processes=0`, this computes immediately in the
 current process; otherwise it starts a process pool asynchronously.
 
-### `ProcNexus.join() -> None`
-Wait for a previously started run to finish. Results are stored on the runner instead
-of being returned directly.
+### `ProcNexus.join(timeout=None) -> None`
+Wait for a previously started run to finish. Results are stored on the runner instead of
+being returned directly. For process-pool runs, `timeout` is passed to each task result
+wait; if it expires, unfinished workers are terminated and
+`multiprocessing.TimeoutError` is raised.
 
 ### `ProcNexus.get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the
-runner is still active, `get()` waits for it to finish before returning.
+runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving
+results.
 
 ### `ProcNexus.run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order.
@@ -80,7 +78,7 @@ submitted tasks queued, so it can be called repeatedly before `start()`.
 ## 📝 Notes
 * The submitted callable should be picklable by `multiprocessing`.
 * Arguments must also be serializable for inter-process communication.
-* Exceptions from worker processes propagate when calling `join()`, `get()`, or `run()`.
+* Exceptions from worker processes propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
@@ -91,22 +89,6 @@ submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## ⚖️ License
 This project falls under the BSD 3-Clause License.
-
-## 🕒 History
-### v0.0.2
-* Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
-* Updated process-pool `run()` execution to use `multiprocessing.Pool.starmap`, preserving ordered results and keyword-argument handling while keeping queued tasks available for a later async run.
-* Added unit coverage for repeated `run()` calls, process-pool execution, keyword arguments, and rejecting `run()` after `start()`.
-
-### v0.0.1
-* Added configurable process handling: negative values use `os.cpu_count()`, `0` runs in-process, and positive values configure `multiprocessing.Pool`.
-* Added asynchronous execution with `start()`, `join()`, and `get()`, while keeping `run()` as the one-shot convenience API.
-* Allowed `submit()` calls after `start()` and before `join()`, preserving submission-order results across queued and late-submitted tasks.
-* Changed `start()` and `join()` to manage lifecycle only and return `None`; retrieve results with `get()` or `run()`.
-* Expanded README/API documentation and added unit coverage for async lifecycle, ordered results, and invalid state transitions.
-
-### v0.0.0
-* Initial release.
 
 """
 
