@@ -1,7 +1,7 @@
 # procnexus
 Provides tools for multiprocessing.
 
-`procnexus` offers a tiny, explicit interface for collecting function calls and executing them concurrently with Python's `multiprocessing.Pool`.
+`procnexus` offers a tiny, explicit interface for collecting function calls and executing them concurrently with Python's `multiprocessing.Pool` or `multiprocessing.pool.ThreadPool`.
 
 ## 🛠️ Installation
 ```sh
@@ -10,10 +10,11 @@ $ pip install procnexus
 
 ## ✨ Features
 * Simple task submission (`submit`) API.
-* Batch execution with process pools.
+* Batch execution with process or thread pools.
 * Asynchronous execution with `start()`, `join()`, and `get()`
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
+* Optional thread-based execution for shared-memory or non-picklable callables.
 
 ## 🚀 Quick Start
 ```python
@@ -42,36 +43,51 @@ job.submit(-1, 8)
 job.join()
 results = job.get()
 print(results)  # [3, 15, 7]
+
+# Use threads=... to run with threads instead of processes.
+job = nexus(add, threads=4)
+job.submit(1, 2)
+job.submit(10, 5)
+print(job.run())  # [3, 15]
 ```
 
 ## 🧩 API
-### `nexus(func, processes=-1) -> ProcNexus`
-Create a `ProcNexus` runner from a callable.  
+### `nexus(func, processes=None, threads=None) -> ParallelNexus`
+Create a sequential runner by default, a process-backed runner with `processes`, or a thread-backed runner with `threads`.
 * `func`: target function for each task.
-* `processes`: worker-process setting.
+* `processes`: process pool size setting.
   * `< 0`: use `os.cpu_count()`.
-  * `= 0`: do not create a process pool; run with normal in-process mapping.
+  * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.Pool`.
+* `threads`: thread pool size setting.
+  * `< 0`: use `os.cpu_count()`.
+  * `0` or `None`: normalize to `None`.
+  * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
+* After normalizing `0` to `None`, exactly one non-`None` setting selects process-backed or thread-backed execution, two non-`None` settings raise `TypeError`, and two `None` settings select sequential execution.
 
-### `ProcNexus.submit(*args, **kwargs) -> None`
+### `ParallelNexus`
+Runners created by `nexus()` are subinstances of `ParallelNexus` who share the same lifecycle and ordered result behavior. The default runner is sequential; passing `processes` uses process-based concurrency, while passing `threads` uses thread-based concurrency. Threads share memory with the parent process, so the submitted callable and arguments do not need to be picklable.
+
+### `submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
 
-### `ProcNexus.start() -> None`
-Start executing all queued tasks. With `processes=0`, this computes immediately in the current process; otherwise it starts a process pool asynchronously.
+### `start() -> None`
+Start executing all queued tasks. Sequential runners compute immediately in the current process; process- and thread-backed runners start asynchronous execution.
 
-### `ProcNexus.join(timeout=None) -> None`
-Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For process-pool runs, `timeout` is passed to each task result wait; if it expires, unfinished workers are terminated and `multiprocessing.TimeoutError` is raised.
+### `join(timeout=None) -> None`
+Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For pooled runs, `timeout` is passed to each task result wait; if it expires, unfinished work is stopped and `multiprocessing.TimeoutError` is raised.
 
-### `ProcNexus.get() -> list`
+### `get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
 
-### `ProcNexus.run() -> list`
+### `run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
-* The submitted callable should be picklable by `multiprocessing`.
-* Arguments must also be serializable for inter-process communication.
-* Exceptions from worker processes propagate when calling `join()` or `run()`.
+* For process runners, the submitted callable should be picklable by `multiprocessing`.
+* For process runners, arguments must also be serializable for inter-process communication.
+* Thread runners share memory and can run non-picklable callables, but Python thread scheduling still follows the normal GIL rules.
+* Exceptions from submitted tasks propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
@@ -84,6 +100,11 @@ Execute all currently queued tasks in parallel and return results in submission 
 This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
+### v0.0.4
+* Added thread-backed execution through `ThreadNexus` with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
+* Changed `nexus()` selection so no worker option creates a sequential runner, while `processes` and `threads` explicitly select mutually exclusive pool-backed runners.
+* Refactored runner classes around the shared `ParallelNexus` lifecycle and renamed the in-process runner to `SequentialNexus`.
+
 ### v0.0.3
 * Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
 * Added `join(timeout=None)` support for process-pool runs, terminating unfinished workers and propagating `multiprocessing.TimeoutError` when a task wait expires.

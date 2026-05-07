@@ -8,62 +8,113 @@ NOTE: this module is private. All functions and objects are available in the mai
 
 __all__ = ["nexus"]
 
+from abc import ABC, abstractmethod
 from multiprocessing import Pool
-from multiprocessing.pool import AsyncResult
+from multiprocessing.pool import AsyncResult, ThreadPool
 from multiprocessing.pool import Pool as PoolType
 from os import cpu_count
-from typing import Callable, Literal
+from typing import Callable, Literal, overload
 
 
-def nexus[**P, T](func: Callable[P, T], *, processes: int = -1) -> "ProcNexus[P, T]":
+@overload
+def nexus[**P, T](
+    func: Callable[P, T], processes: None = None, threads: None = None
+) -> "SequentialNexus[P, T]": ...
+
+
+@overload
+def nexus[**P, T](
+    func: Callable[P, T], processes: int, threads: None = None
+) -> "ProcNexus[P, T]": ...
+
+
+@overload
+def nexus[**P, T](
+    func: Callable[P, T], processes: None = None, threads: int = ...
+) -> "ThreadNexus[P, T]": ...
+
+
+def nexus[**P, T](
+    func: Callable[P, T],
+    processes: int | None = None,
+    threads: int | None = None,
+) -> "ParallelNexus[P, T]":
     """
-    Create a ``ProcNexus`` scheduler for a callable.
+    Create a sequential, process-backed, or thread-backed scheduler for a callable.
 
     This validates arguments and returns a scheduler instance that can collect
-    task arguments through :meth:`ProcNexus.submit` and execute them in
-    parallel through :meth:`ProcNexus.run`, or asynchronously through
-    :meth:`ProcNexus.start`, :meth:`ProcNexus.join`, and :meth:`ProcNexus.get`.
+    task arguments through ``submit`` and execute them through ``run``, or
+    asynchronously through ``start``, ``join``, and ``get``.
 
     Parameters
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
-    processes : int, default=-1
-        Number of worker processes to use. This value is forwarded to
-        :class:`multiprocessing.Pool` when greater than zero. Negative values
-        use ``os.cpu_count()``; zero runs in-process.
+    processes : int | None, default=None
+        Select a process-backed scheduler when non-``None`` after normalization.
+        Positive values are forwarded to ``multiprocessing.Pool``. Negative
+        values use ``os.cpu_count()``. ``0`` is normalized to ``None``.
+    threads : int | None, default=None
+        Select a thread-backed scheduler when non-``None`` after normalization.
+        Positive values are forwarded to ``multiprocessing.pool.ThreadPool``.
+        Negative values use ``os.cpu_count()``. ``0`` is normalized to
+        ``None``. If both worker settings normalize to ``None``, a sequential
+        scheduler is used. If both normalize to non-``None``, ``TypeError`` is
+        raised.
 
     Returns
     -------
-    ProcNexus[P, T]
+    ParallelNexus[P, T]
         A scheduler bound to ``func``.
 
     """
-    if not isinstance(processes, int):
-        raise TypeError(
-            f"invalid type for processes: expected {int}, got {type(processes)} instead"
-        )
     if not callable(func):
         raise TypeError(f"func should be callable, got {func} instead")
-    return ProcNexus(func, processes=processes)
+
+    processes = _validate_worker_count("processes", processes)
+    threads = _validate_worker_count("threads", threads)
+
+    if processes is not None and threads is not None:
+        raise TypeError("processes and threads are mutually exclusive")
+
+    if threads is not None:
+        return ThreadNexus(func, workers=threads)
+    if processes is not None:
+        return ProcNexus(func, workers=processes)
+    return SequentialNexus(func)
 
 
-class ProcNexus[**P, T]:
+def _validate_worker_count(name: str, value: int | None) -> int | None:
+    if not isinstance(value, int | None) or isinstance(value, bool):
+        raise TypeError(
+            f"invalid type for {name}: expected {int | None}, got {type(value)} instead"
+        )
+    if value == 0:
+        return None
+    return value
+
+
+class ParallelNexus[**P, T](ABC):
     """
-    Queue and execute function calls via process-based parallelism.
+    Shared interface and pool-backed scheduler implementation.
+
+    Pool-backed subclasses provide the concrete pool implementation by overriding
+    :meth:`_create_pool`; the lifecycle, task queueing, and result ordering
+    behavior lives here for workers-backed runners. ``SequentialNexus`` handles the
+    in-process execution case separately.
 
     Parameters
     ----------
     func : Callable[P, T]
         Callable executed for each submitted task.
-    processes : int
-        Number of worker processes used by ``multiprocessing.Pool``.
+    workers : int
+        Number of workers used by the selected pool implementation.
 
     """
 
-    def __init__(self, func: Callable[P, T], *, processes: int) -> None:
+    def __init__(self, func: Callable[P, T], *, workers: int) -> None:
         self.func = func
-        self.processes = processes
+        self.workers = workers
         self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
         self._state: Literal["pending", "running", "joined"] = "pending"
         self._pool: PoolType | None = None
@@ -92,10 +143,6 @@ class ProcNexus[**P, T]:
             self.params.append((args, kwargs))
             return
 
-        if self.processes == 0:
-            self._result.append(self.func(*args, **kwargs))
-            return
-
         if self._pool is None:
             raise RuntimeError("nexus is not running")
         self._async_results.append(
@@ -106,26 +153,15 @@ class ProcNexus[**P, T]:
         """
         Start executing queued tasks.
 
-        With ``processes=0``, tasks are computed immediately in the current
-        process. Otherwise, tasks are launched asynchronously in a process pool.
+        Pool-backed runners launch tasks asynchronously in the selected worker
+        pool.
 
         """
         if self._state != "pending":
             raise RuntimeError("cannot start a nexus that has already started")
 
         self._state = "running"
-        if self.processes == 0:
-            self._result.extend(
-                self.func(*args, **kwargs) for args, kwargs in self.params
-            )
-            self.params.clear()
-            return
-
-        processes = self.processes
-        if processes < 0:
-            processes = cpu_count() or 1
-
-        self._pool = Pool(processes=processes)
+        self._pool = self._create_pool(self._resolved_workers())
         self._async_results = [
             self._pool.apply_async(_invoke_func, (self.func, args, kwargs))
             for args, kwargs in self.params
@@ -144,10 +180,9 @@ class ProcNexus[**P, T]:
         Parameters
         ----------
         timeout : float | None, default=None
-            Maximum number of seconds to wait for each process-pool task.
-            ``None`` waits indefinitely. When the timeout expires, unfinished
-            worker processes are terminated and ``multiprocessing.TimeoutError``
-            is raised.
+            Maximum number of seconds to wait for each pool task. ``None`` waits
+            indefinitely. When the timeout expires, unfinished workers are
+            terminated and ``multiprocessing.TimeoutError`` is raised.
 
         """
         if self._state == "pending":
@@ -156,9 +191,6 @@ class ProcNexus[**P, T]:
             raise RuntimeError("cannot join a nexus more than once")
 
         self._state = "joined"
-        if self.processes == 0:
-            return
-
         if self._pool is None:
             raise RuntimeError("nexus is not running")
 
@@ -213,18 +245,78 @@ class ProcNexus[**P, T]:
         if self._state != "pending":
             raise RuntimeError("cannot run a nexus that has already started")
 
-        if self.processes == 0:
-            return [self.func(*args, **kwargs) for args, kwargs in self.params]
-
-        processes = self.processes
-        if processes < 0:
-            processes = cpu_count() or 1
-
-        with Pool(processes=processes) as pool:
+        with self._create_pool(self._resolved_workers()) as pool:
             return pool.starmap(
                 _invoke_func,
                 ((self.func, args, kwargs) for args, kwargs in self.params),
             )
+
+    def _resolved_workers(self) -> int:
+        if self.workers < 0:
+            return cpu_count() or 1
+        return self.workers
+
+    @abstractmethod
+    def _create_pool(self, workers: int) -> PoolType:
+        """Create the concrete worker pool used by this nexus."""
+
+
+class SequentialNexus[**P, T](ParallelNexus[P, T]):
+    """Queue and execute function calls sequentially in the current process."""
+
+    def __init__(self, func: Callable[P, T]) -> None:
+        self.func = func
+        self.params: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        self._state: Literal["pending", "running", "joined"] = "pending"
+        self._result: list[T] = []
+
+    def submit(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        if self._state == "joined":
+            raise RuntimeError("cannot submit tasks after the nexus has joined")
+        if self._state == "pending":
+            self.params.append((args, kwargs))
+            return
+
+        self._result.append(self.func(*args, **kwargs))
+
+    def start(self) -> None:
+        if self._state != "pending":
+            raise RuntimeError("cannot start a nexus that has already started")
+
+        self._state = "running"
+        self._result.extend(self.func(*args, **kwargs) for args, kwargs in self.params)
+        self.params.clear()
+
+    def join(self, timeout: float | None = None) -> None:
+        if self._state == "pending":
+            raise RuntimeError("cannot join before start() has been called")
+        if self._state == "joined":
+            raise RuntimeError("cannot join a nexus more than once")
+
+        self._state = "joined"
+
+    def run(self) -> list[T]:
+        if self._state != "pending":
+            raise RuntimeError("cannot run a nexus that has already started")
+
+        return [self.func(*args, **kwargs) for args, kwargs in self.params]
+
+    def _create_pool(self, workers: int) -> PoolType:
+        raise RuntimeError("sequential nexus does not create a worker pool")
+
+
+class ProcNexus[**P, T](ParallelNexus[P, T]):
+    """Queue and execute function calls via process-based parallelism."""
+
+    def _create_pool(self, workers: int) -> PoolType:
+        return Pool(processes=workers)
+
+
+class ThreadNexus[**P, T](ParallelNexus[P, T]):
+    """Queue and execute function calls via thread-based parallelism."""
+
+    def _create_pool(self, workers: int) -> PoolType:
+        return ThreadPool(processes=workers)
 
 
 def _invoke_func[**P, T](
