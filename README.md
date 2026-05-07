@@ -101,11 +101,14 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.5
+* Renamed the shared runner base from `ParallelNexus` to `ProcNexus` so the public API matches the package name.
+* Renamed pool-backed runners to `MultiProcNexus` and `MultiThreadNexus`, making process-backed and thread-backed implementations explicit.
+* Updated the README/API documentation and unit coverage to use the new runner names while keeping `nexus()` selection behavior unchanged.
 
 ### v0.0.4
-* Added thread-backed execution through `MultiThreadNexus` with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
+* Added thread-backed execution through `ThreadNexus` with shared-memory support for non-picklable callables and the same ordered lifecycle behavior as process-backed runs.
 * Changed `nexus()` selection so no worker option creates a sequential runner, while `processes` and `threads` explicitly select mutually exclusive pool-backed runners.
-* Refactored runner classes around the shared `ProcNexus` lifecycle and renamed the in-process runner to `SequentialNexus`.
+* Refactored runner classes around the shared `ParallelNexus` lifecycle and renamed the in-process runner to `SequentialNexus`.
 
 ### v0.0.3
 * Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
