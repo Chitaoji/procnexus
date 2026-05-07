@@ -284,9 +284,7 @@ class SerialNexus[**P, T](ParallelNexus[P, T]):
             raise RuntimeError("cannot start a nexus that has already started")
 
         self._state = "running"
-        self._result.extend(
-            self.func(*args, **kwargs) for args, kwargs in self.params
-        )
+        self._result.extend(self.func(*args, **kwargs) for args, kwargs in self.params)
         self.params.clear()
 
     def join(self, timeout: float | None = None) -> None:
@@ -315,15 +313,7 @@ class ProcNexus[**P, T](ParallelNexus[P, T]):
 
 
 class ThreadNexus[**P, T](ParallelNexus[P, T]):
-    """
-    Queue and execute function calls via thread-based parallelism.
-
-    This has the same lifecycle and result-ordering behavior as
-    the process-backed runner, but it uses ``multiprocessing.pool.ThreadPool``
-    instead of ``multiprocessing.Pool``. Thread workers share memory with the parent
-    process and do not require submitted callables or arguments to be picklable.
-
-    """
+    """Queue and execute function calls via thread-based parallelism."""
 
     def _create_pool(self, workers: int) -> PoolType:
         return ThreadPool(processes=workers)

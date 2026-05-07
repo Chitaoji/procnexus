@@ -14,7 +14,7 @@ $ pip install procnexus
 * Asynchronous execution with `start()`, `join()`, and `get()`
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
-* Optional thread-based workers for shared-memory or non-picklable callables.
+* Optional thread-based execution for shared-memory or non-picklable callables.
 
 ## 🚀 Quick Start
 ```python
@@ -55,27 +55,27 @@ print(job.run())  # [3, 15]
 ### `nexus(func, processes=None, threads=None) -> ParallelNexus`
 Create a serial runner by default, a process-backed runner with `processes`, or a thread-backed runner with `threads`.
 * `func`: target function for each task.
-* `processes`: process worker setting.
+* `processes`: process pool size setting.
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.Pool`.
-* `threads`: thread worker setting.
+* `threads`: thread pool size setting.
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
-* After normalizing `0` to `None`, exactly one non-`None` worker setting selects `ProcNexus` or `ThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SerialNexus`.
+* After normalizing `0` to `None`, exactly one non-`None` setting selects process-backed or thread-backed execution, two non-`None` settings raise `TypeError`, and two `None` settings select sequential execution.
 
 ### `ParallelNexus`
-Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is serial, and pool-backed runners store their normalized pool size as `workers`; process-backed runners get that value from `processes`, while thread-backed runners get it from `threads`. Serial runners handle the in-process case separately without a `workers` value. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
+Runners created by `nexus()` are subinstances of `ParallelNexus`, who share the same lifecycle and ordered result behavior. The default runner is serial; passing `processes` uses process-based concurrency, while passing `threads` uses thread-based concurrency. Serial runners handle the in-process case separately without a `workers` value. Threads share memory with the parent process, so the submitted callable and arguments do not need to be picklable.
 
 ### `submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later execution. After `start()` and before `join()`, the invocation is scheduled immediately and is included in the ordered `get()` result.
 
 ### `start() -> None`
-Start executing all queued tasks. Serial runners compute immediately in the current process; process- and thread-backed runners start the selected worker pool asynchronously.
+Start executing all queued tasks. Serial runners compute immediately in the current process; process- and thread-backed runners start asynchronous execution.
 
 ### `join(timeout=None) -> None`
-Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For pooled runs, `timeout` is passed to each task result wait; if it expires, unfinished workers are terminated and `multiprocessing.TimeoutError` is raised.
+Wait for a previously started run to finish. Results are stored on the runner instead of being returned directly. For pooled runs, `timeout` is passed to each task result wait; if it expires, unfinished work is stopped and `multiprocessing.TimeoutError` is raised.
 
 ### `get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving results.
@@ -84,10 +84,10 @@ Return results in submission order, including tasks submitted after `start()`. I
 Execute all currently queued tasks in parallel and return results in submission order. This one-shot convenience method leaves the runner in the pending state and keeps submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
-* For process workers, the submitted callable should be picklable by `multiprocessing`.
-* For process workers, arguments must also be serializable for inter-process communication.
-* Thread workers share memory and can run non-picklable callables, but Python thread scheduling still follows the normal GIL rules.
-* Exceptions from workers propagate when calling `join()` or `run()`.
+* For process runners, the submitted callable should be picklable by `multiprocessing`.
+* For process runners, arguments must also be serializable for inter-process communication.
+* Thread runners share memory and can run non-picklable callables, but Python thread scheduling still follows the normal GIL rules.
+* Exceptions from submitted tasks propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
@@ -101,8 +101,7 @@ This project falls under the BSD 3-Clause License.
 
 ## 🕒 History
 ### v0.0.3
-* Changed `get()` to reject calls while a nexus is still running, making `join()` the explicit synchronization point before result retrieval.
-* Added `join(timeout=None)` support for process-pool runs, terminating unfinished workers and propagating `multiprocessing.TimeoutError` when a task wait expires.
+
 
 ### v0.0.2
 * Made `run()` a non-mutating convenience API to better align with Python conventions: it returns results without implicitly advancing the asynchronous `start()`/`join()` lifecycle or consuming queued tasks.
