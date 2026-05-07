@@ -2,7 +2,8 @@ import unittest
 from multiprocessing import TimeoutError
 from time import sleep
 
-from src.procnexus import ProcNexus, ThreadNexus, nexus
+import src.procnexus as procnexus
+from src.procnexus import core, nexus
 
 
 def add(a: int, b: int) -> int:
@@ -14,20 +15,37 @@ def wait_then_return(seconds: float, value: int) -> int:
     return value
 
 
-class ProcNexusTests(unittest.TestCase):
+class NexusTests(unittest.TestCase):
+    def test_public_package_exports_only_nexus(self) -> None:
+        self.assertEqual(procnexus.__all__, ["nexus"])
+        self.assertIs(procnexus.nexus, nexus)
+        self.assertFalse(hasattr(procnexus, "ParallelNexus"))
+        self.assertFalse(hasattr(procnexus, "ProcNexus"))
+        self.assertFalse(hasattr(procnexus, "ThreadNexus"))
+
     def test_nexus_can_create_thread_nexus(self) -> None:
         job = nexus(add, processes=2, threaded=True)
         job.submit(1, 2)
         job.submit(10, 5)
 
-        self.assertIsInstance(job, ThreadNexus)
+        self.assertIsInstance(job, core.ThreadNexus)
         self.assertEqual(job.run(), [3, 15])
 
     def test_nexus_creates_proc_nexus_by_default(self) -> None:
         job = nexus(add, processes=0)
 
-        self.assertIsInstance(job, ProcNexus)
-        self.assertNotIsInstance(job, ThreadNexus)
+        self.assertIsInstance(job, core.ProcNexus)
+        self.assertNotIsInstance(job, core.ThreadNexus)
+
+    def test_proc_and_thread_nexus_share_base_parent(self) -> None:
+        process_job = nexus(add, processes=0)
+        thread_job = nexus(add, processes=0, threaded=True)
+
+        self.assertIsInstance(process_job, core.ParallelNexus)
+        self.assertIsInstance(thread_job, core.ParallelNexus)
+        self.assertTrue(issubclass(core.ProcNexus, core.ParallelNexus))
+        self.assertTrue(issubclass(core.ThreadNexus, core.ParallelNexus))
+        self.assertFalse(issubclass(core.ThreadNexus, core.ProcNexus))
 
     def test_thread_nexus_supports_non_picklable_callables(self) -> None:
         offset = 5
