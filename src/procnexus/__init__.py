@@ -12,7 +12,7 @@ executing them concurrently with Python's `multiprocessing.Pool` or
 * Asynchronous execution with `start()`, `join()`, and `get()`
 * Ordered results (same order as submitted tasks).
 * Lightweight wrapper around the standard library.
-* Optional thread-based workers for shared-memory or non-picklable callables.
+* Optional thread-based execution for shared-memory or non-picklable callables.
 
 ## 🚀 Quick Start
 ```python
@@ -50,53 +50,60 @@ print(job.run())  # [3, 15]
 ```
 
 ## 🧩 API
-### `nexus(func, processes=None, threads=None)`
-Create a sequential runner by default, a process-backed runner with `processes`, or a thread-backed runner with `threads`.
+### `nexus(func, processes=None, threads=None) -> ProcNexus`
+Create a sequential runner by default, a process-backed runner with `processes`, or a
+thread-backed runner with `threads`.
 * `func`: target function for each task.
-* `processes`: process worker setting.
+* `processes`: process pool size setting.
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.Pool`.
-* `threads`: thread worker setting.
+* `threads`: thread pool size setting.
   * `< 0`: use `os.cpu_count()`.
   * `0` or `None`: normalize to `None`.
   * `> 0`: pass directly to `multiprocessing.pool.ThreadPool`.
-* After normalizing `0` to `None`, exactly one non-`None` worker setting selects `MultiProcNexus` or `MultiThreadNexus`, two non-`None` settings raise `TypeError`, and two `None` settings select `SequentialNexus`.
+* After normalizing `0` to `None`, exactly one non-`None` setting selects
+`MultiProcNexus` or `MultiThreadNexus`, two non-`None` settings raise `TypeError`, and
+two `None` settings select sequential execution.
 
-### Runner behavior
-Runners created by `nexus()` share the same lifecycle and ordered result behavior. The default runner is sequential, and pool-backed runners store their normalized pool size as `workers`; process-backed runners get that value from `processes`, while thread-backed runners get it from `threads`. Sequential runners handle the in-process case separately without a `workers` value. Thread workers share memory with the parent process and the submitted callable/arguments do not need to be picklable.
+### `ProcNexus`
+Runners created by `nexus()` are subinstances of `ProcNexus` who share the same
+lifecycle and ordered result behavior. The default runner is sequential; passing
+`processes` uses process-based concurrency, while passing `threads` uses thread-based
+concurrency. Threads share memory with the parent process, so the submitted callable and
+arguments do not need to be picklable.
 
-### `runner.submit(*args, **kwargs) -> None`
+### `submit(*args, **kwargs) -> None`
 Queue one invocation of `func`. Before `start()`, the invocation is stored for later
 execution. After `start()` and before `join()`, the invocation is scheduled immediately
 and is included in the ordered `get()` result.
 
-### `runner.start() -> None`
+### `start() -> None`
 Start executing all queued tasks. Sequential runners compute immediately in the current
-process; process- and thread-backed runners start the selected worker pool
-asynchronously.
+process; process- and thread-backed runners start asynchronous execution.
 
-### `runner.join(timeout=None) -> None`
+### `join(timeout=None) -> None`
 Wait for a previously started run to finish. Results are stored on the runner instead of
-being returned directly. For pooled runs, `timeout` is passed to each task result
-wait; if it expires, unfinished workers are terminated and
-`multiprocessing.TimeoutError` is raised.
+being returned directly. For pooled runs, `timeout` is passed to each task result wait;
+if it expires, unfinished work is stopped and `multiprocessing.TimeoutError` is raised.
 
-### `runner.get() -> list`
+### `get() -> list`
 Return results in submission order, including tasks submitted after `start()`. If the
 runner is still active, `get()` raises `RuntimeError`; call `join()` before retrieving
 results.
 
-### `runner.run() -> list`
+### `run() -> list`
 Execute all currently queued tasks in parallel and return results in submission order.
 This one-shot convenience method leaves the runner in the pending state and keeps
 submitted tasks queued, so it can be called repeatedly before `start()`.
 
 ## 📝 Notes
-* For process workers, the submitted callable should be picklable by `multiprocessing`.
-* For process workers, arguments must also be serializable for inter-process communication.
-* Thread workers share memory and can run non-picklable callables, but Python thread scheduling still follows the normal GIL rules.
-* Exceptions from workers propagate when calling `join()` or `run()`.
+* For process runners, the submitted callable should be picklable by `multiprocessing`.
+* For process runners, arguments must also be serializable for inter-process
+communication.
+* Thread runners share memory and can run non-picklable callables, but Python thread
+scheduling still follows the normal GIL rules.
+* Exceptions from submitted tasks propagate when calling `join()` or `run()`.
 
 ## 🔗 See Also
 ### Github repository
